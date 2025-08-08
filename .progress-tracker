@@ -1,0 +1,21 @@
+# Expiry Date Tracker - Progress Tracker
+# This file tracks the completion status of each phase and commit
+# Format: [STATUS] Phase X - Commit Y: Description
+
+## Phase 1: Project Foundation (Frontend Tasks)
+[✓] Commit 1: Initialize React Native project with TypeScript
+[ ] Commit 2: Install and configure Firebase SDK (client-side)
+[ ] Commit 3: Set up React Navigation structure
+[ ] Commit 4: Configure Redux Toolkit store and basic slices
+
+## Current Status
+- Current Phase: 1
+- Last Completed: Commit 1 - Initialize React Native project with TypeScript
+- Next Task: Commit 2 - Install and configure Firebase SDK (client-side)
+- Date Started: August 9, 2025
+
+## Notes
+- Using React Native CLI with TypeScript
+- Target platforms: iOS and Android
+- Tech stack: React Native, Firebase, Google ML Kit
+- Project initialized in: C:\Users\SANDIPAN NAYEK\Desktop\new\expiry-date-tracker
