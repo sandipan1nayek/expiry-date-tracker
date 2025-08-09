@@ -1,4 +1,4 @@
-import { auth, firestore, storage, messaging } from '../config/firebase';
+import { auth, firestore } from '../config/firebase';
 import { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 
@@ -41,7 +41,8 @@ export class FirebaseService {
     return firestore().doc(path);
   }
 
-  // Storage methods
+  // Storage methods (will be implemented in Phase 9)
+  /*
   static getStorage() {
     return storage();
   }
@@ -49,8 +50,10 @@ export class FirebaseService {
   static storageRef(path?: string) {
     return storage().ref(path);
   }
+  */
 
-  // Messaging methods
+  // Messaging methods (will be implemented in Phase 6)
+  /*
   static async getMessaging() {
     return messaging();
   }
@@ -66,6 +69,7 @@ export class FirebaseService {
   static async getToken(): Promise<string> {
     return messaging().getToken();
   }
+  */
 }
 
 export default FirebaseService;

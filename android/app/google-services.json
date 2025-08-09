@@ -1,33 +1,33 @@
 {
   "project_info": {
-    "project_number": "YOUR_PROJECT_NUMBER",
-    "project_id": "your-project-id",
-    "storage_bucket": "your-project-id.appspot.com"
+    "project_number": "478257921684",
+    "project_id": "expiary-tracker",
+    "storage_bucket": "expiary-tracker.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "YOUR_ANDROID_APP_ID",
+        "mobilesdk_app_id": "1:478257921684:android:9937f6367b528497c5fe81",
         "android_client_info": {
           "package_name": "com.expirydatetracker"
         }
       },
       "oauth_client": [
         {
-          "client_id": "YOUR_CLIENT_ID",
+          "client_id": "478257921684-9qiuurevfqvm15nl127u5r1jsqbffsb3.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "YOUR_API_KEY"
+          "current_key": "AIzaSyBgVeKb4gr2qG-NZ_V-ghvMjlK_f_ENIvM"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "YOUR_CLIENT_ID",
+              "client_id": "478257921684-9qiuurevfqvm15nl127u5r1jsqbffsb3.apps.googleusercontent.com",
               "client_type": 3
             }
           ]

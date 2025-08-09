@@ -2,7 +2,8 @@
 
 ## Prerequisites
 1. Create a Firebase project at https://console.firebase.google.com/
-2. Enable Authentication, Firestore Database, Storage, and Cloud Messaging
+2. Enable Authentication and Firestore Database (✅ COMPLETED)
+3. Storage and Cloud Messaging will be enabled in later phases
 
 ## Android Setup
 1. Add Android app to your Firebase project
@@ -21,11 +22,11 @@
 - Replace placeholder values with actual Firebase project values
 - Never commit actual Firebase config files to version control
 
-## Firebase Services Configured
-- Authentication
-- Firestore Database
-- Storage
-- Cloud Messaging
+## Firebase Services Currently Enabled
+- ✅ Authentication
+- ✅ Firestore Database
+- ⏳ Storage (will be enabled in Phase 9)
+- ⏳ Cloud Messaging (will be enabled in Phase 6)
 
 ## Usage
 Import Firebase services from:
