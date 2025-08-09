@@ -41,6 +41,40 @@ export class FirebaseService {
     return firestore().doc(path);
   }
 
+  // Document operations
+  static async addDocument(collectionPath: string, data: any): Promise<FirebaseFirestoreTypes.DocumentReference> {
+    return firestore().collection(collectionPath).add(data);
+  }
+
+  static async setDocument(documentPath: string, data: any): Promise<void> {
+    return firestore().doc(documentPath).set(data);
+  }
+
+  static async updateDocument(collectionPath: string, documentId: string, data: any): Promise<void> {
+    return firestore().collection(collectionPath).doc(documentId).update(data);
+  }
+
+  static async deleteDocument(collectionPath: string, documentId: string): Promise<void> {
+    return firestore().collection(collectionPath).doc(documentId).delete();
+  }
+
+  static async getDocument(collectionPath: string, documentId: string): Promise<FirebaseFirestoreTypes.DocumentSnapshot> {
+    return firestore().collection(collectionPath).doc(documentId).get();
+  }
+
+  static async getCollection(collectionPath: string): Promise<FirebaseFirestoreTypes.QuerySnapshot> {
+    return firestore().collection(collectionPath).get();
+  }
+
+  static async queryDocuments(
+    collectionPath: string,
+    field: string,
+    operator: FirebaseFirestoreTypes.WhereFilterOp,
+    value: any
+  ): Promise<FirebaseFirestoreTypes.QuerySnapshot> {
+    return firestore().collection(collectionPath).where(field, operator, value).get();
+  }
+
   // Storage methods (will be implemented in Phase 9)
   /*
   static getStorage() {

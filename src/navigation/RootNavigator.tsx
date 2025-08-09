@@ -1,11 +1,14 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { ActivityIndicator, View, StyleSheet } from 'react-native';
 
-// Import screens (will be created later)
+// Import screens
 import AuthStackNavigator from './AuthStackNavigator';
 import MainTabNavigator from './MainTabNavigator';
+
+// Import auth context
+import { useAuth } from '../contexts/AuthContext';
 
 // Navigation types
 export type RootStackParamList = {
@@ -16,8 +19,16 @@ export type RootStackParamList = {
 const RootStack = createStackNavigator<RootStackParamList>();
 
 const RootNavigator: React.FC = () => {
-  // TODO: Add authentication state logic
-  const isAuthenticated = false; // This will be managed by Redux/Context later
+  const { isAuthenticated, isInitialized } = useAuth();
+
+  // Show loading screen while checking auth state
+  if (!isInitialized) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#2196F3" />
+      </View>
+    );
+  }
 
   return (
     <NavigationContainer>
@@ -34,5 +45,14 @@ const RootNavigator: React.FC = () => {
     </NavigationContainer>
   );
 };
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+});
 
 export default RootNavigator;

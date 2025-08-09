@@ -2,11 +2,18 @@
 export interface Product {
   id: string;
   name: string;
+  brand?: string;
   category: string;
-  expiryDate: string;
-  quantity: number;
-  imageUrl?: string;
   barcode?: string;
+  expiryDate: string;
+  purchaseDate?: string;
+  price?: number;
+  quantity: number;
+  unit: string;
+  location?: string;
+  notes?: string;
+  imageUrl?: string;
+  isFinished: boolean;
   createdAt: string;
   updatedAt: string;
   userId: string;
@@ -44,6 +51,7 @@ export interface ApiResponse<T> {
 // Database types
 export interface LocalProduct extends Omit<Product, 'id'> {
   localId: string;
+  id?: string; // Firebase ID when synced
   syncStatus: 'synced' | 'pending' | 'error';
   lastSyncAt?: string;
 }
@@ -59,6 +67,7 @@ export type ScreenNavigationProp<T extends keyof any> = {
 export interface LoginForm {
   email: string;
   password: string;
+  rememberMe?: boolean;
 }
 
 export interface SignupForm {
