@@ -649,6 +649,7 @@ const styles = StyleSheet.create({
   },
   productListContainer: {
     padding: 20,
+    paddingBottom: 100,
   },
   productCard: {
     backgroundColor: COLORS.WHITE,

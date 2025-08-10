@@ -388,6 +388,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: 16,
+    paddingBottom: 160,
   },
   medicineCard: {
     backgroundColor: COLORS.WHITE,
@@ -572,7 +573,7 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 90,
     right: 20,
     width: 56,
     height: 56,

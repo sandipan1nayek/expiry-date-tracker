@@ -139,9 +139,9 @@ const MainTabNavigator: React.FC = () => {
         tabBarActiveTintColor: '#2196F3',
         tabBarInactiveTintColor: '#666',
         tabBarStyle: {
-          paddingBottom: Math.max(insets.bottom, 15),
-          paddingTop: 15,
-          height: 70 + Math.max(insets.bottom, 15),
+          paddingBottom: Math.max(insets.bottom, 10),
+          paddingTop: 8,
+          height: 65 + Math.max(insets.bottom, 10),
           backgroundColor: '#fff',
           borderTopWidth: 1,
           borderTopColor: '#e1e8ed',
@@ -158,10 +158,10 @@ const MainTabNavigator: React.FC = () => {
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: '600',
-          marginTop: 4,
+          marginTop: 2,
         },
         tabBarIconStyle: {
-          marginTop: 8,
+          marginTop: 4,
         },
       }}>
       <MainTab.Screen
