@@ -13,13 +13,14 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS } from '../../constants';
+import { useAuth } from '../../contexts/AuthContext';
 
 type SignupScreenNavigationProp = StackNavigationProp<any, 'Signup'>;
 
 const SignupScreen: React.FC = () => {
   const navigation = useNavigation<SignupScreenNavigationProp>();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -68,15 +69,15 @@ const SignupScreen: React.FC = () => {
       // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 1500));
       
-      // Store user data
+      // Store user data using auth context
       const userData = {
         name: name.trim(),
         email: email.trim(),
-        registrationTime: new Date().toISOString(),
+        loginTime: new Date().toISOString(),
         isAuthenticated: true,
       };
       
-      await AsyncStorage.setItem('@user_data', JSON.stringify(userData));
+      await login(userData);
       
       Alert.alert(
         'Success',

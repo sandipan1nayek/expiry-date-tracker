@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../../contexts/AuthContext';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { loadProducts } from '../../store/thunks/inventoryThunks';
 import { COLORS } from '../../constants';
@@ -49,12 +49,13 @@ interface UserData {
 const ProfileScreen: React.FC = () => {
   const navigation = useNavigation<ProfileScreenNavigationProp>();
   const dispatch = useAppDispatch();
-  const { products, isLoading } = useAppSelector(state => state.inventory);
+  const { user, logout } = useAuth();
+  const { products: storeProducts, isLoading: storeLoading } = useAppSelector(state => state.inventory);
 
   const [refreshing, setRefreshing] = useState(false);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [categoryBreakdown, setCategoryBreakdown] = useState<CategoryBreakdown[]>([]);
-  const [userData, setUserData] = useState<UserData | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Chart colors for categories
   const chartColors = [
@@ -64,26 +65,13 @@ const ProfileScreen: React.FC = () => {
 
   useEffect(() => {
     loadDashboardData();
-    loadUserData();
   }, []);
 
   useEffect(() => {
-    if (products.length >= 0) {
+    if (storeProducts.length >= 0) {
       calculateDashboardStats();
     }
-  }, [products]);
-
-  const loadUserData = async () => {
-    try {
-      const userDataStr = await AsyncStorage.getItem('@user_data');
-      if (userDataStr) {
-        const user = JSON.parse(userDataStr);
-        setUserData(user);
-      }
-    } catch (error) {
-      console.error('Failed to load user data:', error);
-    }
-  };
+  }, [storeProducts]);
 
   const loadDashboardData = async () => {
     try {
@@ -110,11 +98,8 @@ const ProfileScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await AsyncStorage.removeItem('@user_data');
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'Auth' }],
-              });
+              await logout();
+              // Navigation will be handled automatically by RootNavigator
             } catch (error) {
               Alert.alert('Error', 'Failed to sign out');
             }
@@ -125,7 +110,7 @@ const ProfileScreen: React.FC = () => {
   };
 
   const calculateDashboardStats = async () => {
-    if (!products.length) {
+    if (!storeProducts.length) {
       setDashboardStats({
         totalProducts: 0,
         expiredProducts: 0,
@@ -145,9 +130,9 @@ const ProfileScreen: React.FC = () => {
       
       // Get recently added products (last 7 days)
       const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      const recentlyAdded = products
-        .filter(product => new Date(product.createdAt) > weekAgo)
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      const recentlyAdded = storeProducts
+        .filter((product: LocalProduct) => new Date(product.createdAt) > weekAgo)
+        .sort((a: LocalProduct, b: LocalProduct) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .slice(0, 5);
 
       const stats: DashboardStats = {
@@ -253,8 +238,8 @@ const ProfileScreen: React.FC = () => {
       <View style={styles.header}>
         <View style={styles.userInfo}>
           <Text style={styles.welcomeText}>Welcome back!</Text>
-          <Text style={styles.userName}>{userData?.name || 'User'}</Text>
-          <Text style={styles.userEmail}>{userData?.email || ''}</Text>
+          <Text style={styles.userName}>{user?.name || 'User'}</Text>
+          <Text style={styles.userEmail}>{user?.email || ''}</Text>
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity 
