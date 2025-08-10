@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { LocalProduct } from '../../types';
+import { loadProducts, addProductThunk } from '../thunks/inventoryThunks';
 
 export interface InventoryState {
   products: LocalProduct[];
@@ -183,6 +184,37 @@ const inventorySlice = createSlice({
     resetInventoryState: (state) => {
       Object.assign(state, initialState);
     },
+  },
+  extraReducers: (builder) => {
+    builder
+      // Load Products
+      .addCase(loadProducts.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(loadProducts.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.products = action.payload;
+        state.error = null;
+      })
+      .addCase(loadProducts.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      })
+      // Add Product
+      .addCase(addProductThunk.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(addProductThunk.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.products.push(action.payload);
+        state.error = null;
+      })
+      .addCase(addProductThunk.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      });
   },
 });
 

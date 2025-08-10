@@ -150,8 +150,11 @@ export const getProductsByCategoryThunk = createAsyncThunk(
   'inventory/getProductsByCategory',
   async (category: string, { rejectWithValue }) => {
     try {
-      const products = await SQLiteService.getProductsByCategory(category);
-      return products;
+      const result = await SyncService.getProductsByCategory(category);
+      if (!result.success) {
+        return rejectWithValue(result.error || 'Failed to get products by category');
+      }
+      return result.data!;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to get products by category');
     }

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,19 +9,21 @@ import {
   Alert,
   TextInput,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   initializeDatabase,
   loadProducts,
   deleteProductThunk as deleteProduct,
-  addProductThunk as addProduct,
+  getExpiredProductsThunk as getExpiredProducts,
+  getExpiringProductsThunk as getExpiringProducts,
   searchProductsThunk as searchProducts,
 } from '../../store/thunks/inventoryThunks';
-import { setSearchQuery, clearAllProducts } from '../../store/slices/inventorySlice';
-import { COLORS, ROUTES } from '../../constants';
+import { setSearchQuery } from '../../store/slices/inventorySlice';
+import { COLORS, ROUTES, SORT_OPTIONS } from '../../constants';
 import { LocalProduct } from '../../types';
 
 type InventoryListScreenNavigationProp = StackNavigationProp<any, 'InventoryList'>;
@@ -29,27 +31,39 @@ type InventoryListScreenNavigationProp = StackNavigationProp<any, 'InventoryList
 const InventoryListScreen: React.FC = () => {
   const navigation = useNavigation<InventoryListScreenNavigationProp>();
   const dispatch = useAppDispatch();
-  const { products, isLoading, error, searchQuery } = useAppSelector(state => state.inventory);
+  const { products, isLoading, error } = useAppSelector(state => state.inventory);
 
   const [refreshing, setRefreshing] = useState(false);
   const [searchText, setSearchText] = useState('');
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newProduct, setNewProduct] = useState({
-    name: '',
-    expiryDate: '',
-    category: '',
-    quantity: '1',
-  });
+  const [filteredProducts, setFilteredProducts] = useState<LocalProduct[]>([]);
+  
+  // Filter and sort states
+  const [filterCategory, setFilterCategory] = useState('All');
+  const [filterStatus, setFilterStatus] = useState('All');
+  const [sortBy, setSortBy] = useState('expiryDate');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  
+  // Modal states
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showSortModal, setShowSortModal] = useState(false);
 
   useEffect(() => {
     handleLoadProducts();
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      handleLoadProducts();
+    }, [])
+  );
+
+  useEffect(() => {
+    applyFiltersAndSort();
+  }, [products, searchText, filterCategory, filterStatus, sortBy, sortOrder]);
+
   const handleLoadProducts = async () => {
     try {
-      // Initialize database first if not already done
       await dispatch(initializeDatabase()).unwrap();
-      // Then load products
       await dispatch(loadProducts()).unwrap();
     } catch (error) {
       console.error('Failed to load products:', error);
@@ -62,14 +76,77 @@ const InventoryListScreen: React.FC = () => {
     setRefreshing(false);
   };
 
-  const handleSearch = (text: string) => {
-    setSearchText(text);
-    dispatch(setSearchQuery(text));
-    if (text.trim()) {
-      dispatch(searchProducts(text));
-    } else {
-      dispatch(setSearchQuery(''));
+  const getExpiryStatus = (expiryDate: string) => {
+    const today = new Date();
+    const expiry = new Date(expiryDate);
+    const diffTime = expiry.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) return { status: 'Expired', color: COLORS.EXPIRED, days: Math.abs(diffDays) };
+    if (diffDays <= 3) return { status: 'Expiring Soon', color: COLORS.EXPIRING_SOON, days: diffDays };
+    if (diffDays <= 7) return { status: 'Warning', color: COLORS.WARNING, days: diffDays };
+    return { status: 'Fresh', color: COLORS.FRESH, days: diffDays };
+  };
+
+  const applyFiltersAndSort = () => {
+    let filtered = [...products];
+
+    // Apply search filter
+    if (searchText.trim()) {
+      const searchLower = searchText.toLowerCase();
+      filtered = filtered.filter(product =>
+        product.name.toLowerCase().includes(searchLower) ||
+        product.brand?.toLowerCase().includes(searchLower) ||
+        product.category.toLowerCase().includes(searchLower) ||
+        product.notes?.toLowerCase().includes(searchLower)
+      );
     }
+
+    // Apply category filter
+    if (filterCategory !== 'All') {
+      filtered = filtered.filter(product => product.category === filterCategory);
+    }
+
+    // Apply status filter
+    if (filterStatus !== 'All') {
+      filtered = filtered.filter(product => {
+        const status = getExpiryStatus(product.expiryDate).status;
+        return status === filterStatus;
+      });
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let aValue, bValue;
+      
+      switch (sortBy) {
+        case 'name':
+          aValue = a.name.toLowerCase();
+          bValue = b.name.toLowerCase();
+          break;
+        case 'expiryDate':
+          aValue = new Date(a.expiryDate).getTime();
+          bValue = new Date(b.expiryDate).getTime();
+          break;
+        case 'createdAt':
+          aValue = new Date(a.createdAt).getTime();
+          bValue = new Date(b.createdAt).getTime();
+          break;
+        case 'quantity':
+          aValue = a.quantity;
+          bValue = b.quantity;
+          break;
+        default:
+          aValue = a.expiryDate;
+          bValue = b.expiryDate;
+      }
+
+      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    setFilteredProducts(filtered);
   };
 
   const handleDeleteProduct = (product: LocalProduct) => {
@@ -81,66 +158,42 @@ const InventoryListScreen: React.FC = () => {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => dispatch(deleteProduct(product.localId)),
+          onPress: async () => {
+            try {
+              await dispatch(deleteProduct(product.localId)).unwrap();
+              Alert.alert('Success', 'Product deleted successfully');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to delete product');
+            }
+          },
         },
       ]
     );
   };
 
-  const handleAddProduct = async () => {
-    if (!newProduct.name.trim() || !newProduct.expiryDate.trim()) {
-      Alert.alert('Error', 'Please fill in all required fields');
-      return;
-    }
-
-    // Validate date format (YYYY-MM-DD)
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(newProduct.expiryDate)) {
-      Alert.alert('Error', 'Please enter expiry date in YYYY-MM-DD format');
-      return;
-    }
-
-    try {
-      const productData = {
-        name: newProduct.name.trim(),
-        brand: '',
-        category: newProduct.category.trim() || 'Other',
-        expiryDate: newProduct.expiryDate,
-        quantity: parseInt(newProduct.quantity) || 1,
-        unit: 'pcs',
-        isFinished: false,
-        notes: '',
-        userId: 'demo-user-123', // TODO: Get from auth state
-        purchaseDate: new Date().toISOString().split('T')[0],
-        location: '',
-        price: 0,
-      };
-
-      console.log('Adding product:', productData);
-      await dispatch(addProduct(productData)).unwrap();
-
-      setNewProduct({ name: '', expiryDate: '', category: '', quantity: '1' });
-      setShowAddModal(false);
-      Alert.alert('Success', 'Product added successfully!');
-    } catch (error) {
-      console.error('Failed to add product:', error);
-      Alert.alert('Error', `Failed to add product: ${error}`);
-    }
+  const getUniqueCategories = () => {
+    const categories = products.map(p => p.category);
+    return ['All', ...Array.from(new Set(categories))];
   };
 
-  const getExpiryStatus = (expiryDate: string) => {
-    const today = new Date();
-    const expiry = new Date(expiryDate);
-    const diffTime = expiry.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const getStatusCounts = () => {
+    const counts = {
+      All: products.length,
+      Expired: 0,
+      'Expiring Soon': 0,
+      Warning: 0,
+      Fresh: 0,
+    };
 
-    if (diffDays < 0) return { status: 'Expired', color: COLORS.EXPIRED };
-    if (diffDays <= 3) return { status: 'Expiring Soon', color: COLORS.EXPIRING_SOON };
-    if (diffDays <= 7) return { status: 'Warning', color: COLORS.WARNING };
-    return { status: 'Fresh', color: COLORS.FRESH };
+    products.forEach(product => {
+      const status = getExpiryStatus(product.expiryDate).status;
+      counts[status as keyof typeof counts]++;
+    });
+
+    return counts;
   };
 
-  const renderProduct = ({ item }: { item: LocalProduct }) => {
+  const renderProductCard = ({ item }: { item: LocalProduct }) => {
     const expiryInfo = getExpiryStatus(item.expiryDate);
     
     return (
@@ -149,7 +202,10 @@ const InventoryListScreen: React.FC = () => {
         onPress={() => navigation.navigate(ROUTES.PRODUCT_DETAIL, { productId: item.localId })}
       >
         <View style={styles.productHeader}>
-          <Text style={styles.productName}>{item.name}</Text>
+          <View style={styles.productInfo}>
+            <Text style={styles.productName}>{item.name}</Text>
+            {item.brand && <Text style={styles.productBrand}>{item.brand}</Text>}
+          </View>
           <View style={styles.syncStatus}>
             <View
               style={[
@@ -160,123 +216,289 @@ const InventoryListScreen: React.FC = () => {
           </View>
         </View>
 
-        <Text style={styles.productCategory}>{item.category}</Text>
-        <Text style={styles.productExpiry}>
-          Expires: {new Date(item.expiryDate).toLocaleDateString()}
-        </Text>
-        <Text style={styles.productQuantity}>Quantity: {item.quantity} {item.unit}</Text>
+        <View style={styles.productDetails}>
+          <Text style={styles.productCategory}>{item.category}</Text>
+          <Text style={styles.productExpiry}>
+            Expires: {new Date(item.expiryDate).toLocaleDateString()}
+          </Text>
+          <Text style={styles.productQuantity}>{item.quantity} {item.unit}</Text>
+          {item.location && (
+            <Text style={styles.productLocation}>📍 {item.location}</Text>
+          )}
+        </View>
 
         <View style={styles.productFooter}>
-          <Text style={[styles.productStatus, { color: expiryInfo.color }]}>
-            {expiryInfo.status}
-          </Text>
+          <View style={[styles.statusBadge, { backgroundColor: expiryInfo.color }]}>
+            <Text style={styles.statusText}>
+              {expiryInfo.status}
+              {expiryInfo.status === 'Expired' ? ` (${expiryInfo.days}d ago)` : 
+               expiryInfo.status !== 'Fresh' ? ` (${expiryInfo.days}d)` : ''}
+            </Text>
+          </View>
           <TouchableOpacity
             style={styles.deleteButton}
             onPress={() => handleDeleteProduct(item)}
           >
-            <Text style={styles.deleteButtonText}>Delete</Text>
+            <Text style={styles.deleteButtonText}>🗑️</Text>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
   };
 
+  const renderFilterModal = () => (
+    <Modal visible={showFilterModal} animationType="slide" transparent>
+      <View style={styles.modalContainer}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Filter Products</Text>
+
+          <Text style={styles.filterSectionTitle}>Category</Text>
+          <View style={styles.filterOptions}>
+            {getUniqueCategories().map(category => (
+              <TouchableOpacity
+                key={category}
+                style={[
+                  styles.filterOption,
+                  filterCategory === category && styles.selectedFilterOption
+                ]}
+                onPress={() => setFilterCategory(category)}
+              >
+                <Text style={[
+                  styles.filterOptionText,
+                  filterCategory === category && styles.selectedFilterText
+                ]}>
+                  {category}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={styles.filterSectionTitle}>Status</Text>
+          <View style={styles.filterOptions}>
+            {Object.entries(getStatusCounts()).map(([status, count]) => (
+              <TouchableOpacity
+                key={status}
+                style={[
+                  styles.filterOption,
+                  filterStatus === status && styles.selectedFilterOption
+                ]}
+                onPress={() => setFilterStatus(status)}
+              >
+                <Text style={[
+                  styles.filterOptionText,
+                  filterStatus === status && styles.selectedFilterText
+                ]}>
+                  {status} ({count})
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={styles.modalActions}>
+            <TouchableOpacity
+              style={[styles.modalButton, styles.clearButton]}
+              onPress={() => {
+                setFilterCategory('All');
+                setFilterStatus('All');
+              }}
+            >
+              <Text style={styles.clearButtonText}>Clear All</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalButton, styles.applyButton]}
+              onPress={() => setShowFilterModal(false)}
+            >
+              <Text style={styles.applyButtonText}>Apply</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  const renderSortModal = () => (
+    <Modal visible={showSortModal} animationType="slide" transparent>
+      <View style={styles.modalContainer}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Sort Products</Text>
+
+          <Text style={styles.filterSectionTitle}>Sort By</Text>
+          {SORT_OPTIONS.map(option => (
+            <TouchableOpacity
+              key={option.value}
+              style={[
+                styles.sortOption,
+                sortBy === option.value && styles.selectedSortOption
+              ]}
+              onPress={() => setSortBy(option.value)}
+            >
+              <Text style={[
+                styles.sortOptionText,
+                sortBy === option.value && styles.selectedSortText
+              ]}>
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+
+          <Text style={styles.filterSectionTitle}>Order</Text>
+          <View style={styles.filterOptions}>
+            <TouchableOpacity
+              style={[
+                styles.filterOption,
+                sortOrder === 'asc' && styles.selectedFilterOption
+              ]}
+              onPress={() => setSortOrder('asc')}
+            >
+              <Text style={[
+                styles.filterOptionText,
+                sortOrder === 'asc' && styles.selectedFilterText
+              ]}>
+                Ascending
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.filterOption,
+                sortOrder === 'desc' && styles.selectedFilterOption
+              ]}
+              onPress={() => setSortOrder('desc')}
+            >
+              <Text style={[
+                styles.filterOptionText,
+                sortOrder === 'desc' && styles.selectedFilterText
+              ]}>
+                Descending
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.modalButton, styles.applyButton, { marginTop: 20 }]}
+            onPress={() => setShowSortModal(false)}
+          >
+            <Text style={styles.applyButtonText}>Apply</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
   return (
     <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>My Products</Text>
+        <View style={styles.headerTitle}>
+          <Text style={styles.title}>My Inventory</Text>
+          <Text style={styles.subtitle}>{filteredProducts.length} products</Text>
+        </View>
         <TouchableOpacity
           style={styles.addButton}
-          onPress={() => setShowAddModal(true)}
+          onPress={() => navigation.navigate(ROUTES.ADD_PRODUCT)}
         >
           <Text style={styles.addButtonText}>+ Add</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search products..."
-          value={searchText}
-          onChangeText={handleSearch}
-        />
+      {/* Search and Controls */}
+      <View style={styles.controlsContainer}>
+        <View style={styles.searchContainer}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search products..."
+            value={searchText}
+            onChangeText={setSearchText}
+            placeholderTextColor={COLORS.GRAY_MEDIUM}
+          />
+        </View>
+        
+        <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={styles.controlButton}
+            onPress={() => setShowFilterModal(true)}
+          >
+            <Text style={styles.controlButtonText}>Filter</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.controlButton}
+            onPress={() => setShowSortModal(true)}
+          >
+            <Text style={styles.controlButtonText}>Sort</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
+      {/* Quick Stats */}
+      {products.length > 0 && (
+        <View style={styles.statsContainer}>
+          <View style={[styles.statCard, { backgroundColor: COLORS.EXPIRED }]}>
+            <Text style={styles.statNumber}>{getStatusCounts().Expired}</Text>
+            <Text style={styles.statLabel}>Expired</Text>
+          </View>
+          <View style={[styles.statCard, { backgroundColor: COLORS.EXPIRING_SOON }]}>
+            <Text style={styles.statNumber}>{getStatusCounts()['Expiring Soon']}</Text>
+            <Text style={styles.statLabel}>Expiring</Text>
+          </View>
+          <View style={[styles.statCard, { backgroundColor: COLORS.WARNING }]}>
+            <Text style={styles.statNumber}>{getStatusCounts().Warning}</Text>
+            <Text style={styles.statLabel}>Warning</Text>
+          </View>
+          <View style={[styles.statCard, { backgroundColor: COLORS.FRESH }]}>
+            <Text style={styles.statNumber}>{getStatusCounts().Fresh}</Text>
+            <Text style={styles.statLabel}>Fresh</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Error Display */}
       {error && (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
         </View>
       )}
 
-      <FlatList
-        data={products}
-        renderItem={renderProduct}
-        keyExtractor={(item) => item.localId}
-        style={styles.productList}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No products found</Text>
-            <Text style={styles.emptySubtext}>Add your first product to get started</Text>
-          </View>
-        }
-      />
-
-      {/* Add Product Modal */}
-      <Modal visible={showAddModal} animationType="slide" transparent>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add New Product</Text>
-
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Product Name"
-              value={newProduct.name}
-              onChangeText={(text) => setNewProduct({ ...newProduct, name: text })}
-            />
-
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Category"
-              value={newProduct.category}
-              onChangeText={(text) => setNewProduct({ ...newProduct, category: text })}
-            />
-
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Expiry Date (YYYY-MM-DD)"
-              value={newProduct.expiryDate}
-              onChangeText={(text) => setNewProduct({ ...newProduct, expiryDate: text })}
-            />
-
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Quantity"
-              value={newProduct.quantity}
-              onChangeText={(text) => setNewProduct({ ...newProduct, quantity: text })}
-              keyboardType="numeric"
-            />
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setShowAddModal(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton]}
-                onPress={handleAddProduct}
-              >
-                <Text style={styles.saveButtonText}>Add Product</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+      {/* Product List */}
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.PRIMARY} />
+          <Text style={styles.loadingText}>Loading products...</Text>
         </View>
-      </Modal>
+      ) : (
+        <FlatList
+          data={filteredProducts}
+          renderItem={renderProductCard}
+          keyExtractor={(item) => item.localId}
+          style={styles.productList}
+          contentContainerStyle={styles.productListContainer}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyIcon}>📦</Text>
+              <Text style={styles.emptyText}>No products found</Text>
+              <Text style={styles.emptySubtext}>
+                {searchText || filterCategory !== 'All' || filterStatus !== 'All'
+                  ? 'Try adjusting your filters or search terms'
+                  : 'Add your first product to get started'
+                }
+              </Text>
+              {(!searchText && filterCategory === 'All' && filterStatus === 'All') && (
+                <TouchableOpacity
+                  style={styles.emptyButton}
+                  onPress={() => navigation.navigate(ROUTES.ADD_PRODUCT)}
+                >
+                  <Text style={styles.emptyButtonText}>Add Product</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          }
+        />
+      )}
+
+      {/* Modals */}
+      {renderFilterModal()}
+      {renderSortModal()}
     </View>
   );
 };
@@ -285,18 +507,29 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.WHITE,
-    paddingHorizontal: 16,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 20,
     paddingVertical: 16,
+    backgroundColor: COLORS.WHITE,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.GRAY_LIGHT,
+  },
+  headerTitle: {
+    flex: 1,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: COLORS.BLACK,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: COLORS.GRAY_MEDIUM,
+    marginTop: 2,
   },
   addButton: {
     backgroundColor: COLORS.PRIMARY,
@@ -308,8 +541,13 @@ const styles = StyleSheet.create({
     color: COLORS.WHITE,
     fontWeight: '600',
   },
+  controlsContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: COLORS.GRAY_LIGHT,
+  },
   searchContainer: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   searchInput: {
     borderWidth: 1,
@@ -318,28 +556,79 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
+    backgroundColor: COLORS.WHITE,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  controlButton: {
+    backgroundColor: COLORS.WHITE,
+    borderWidth: 1,
+    borderColor: COLORS.GRAY_MEDIUM,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  controlButtonText: {
+    color: COLORS.GRAY_DARK,
+    fontWeight: '600',
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  statCard: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: COLORS.WHITE,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: COLORS.WHITE,
+    marginTop: 2,
   },
   errorContainer: {
     backgroundColor: COLORS.ERROR,
     padding: 12,
+    marginHorizontal: 20,
+    marginVertical: 8,
     borderRadius: 8,
-    marginBottom: 16,
   },
   errorText: {
     color: COLORS.WHITE,
     textAlign: 'center',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: COLORS.GRAY_DARK,
+  },
   productList: {
     flex: 1,
   },
+  productListContainer: {
+    padding: 20,
+  },
   productCard: {
     backgroundColor: COLORS.WHITE,
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderLeftWidth: 4,
-    borderWidth: 1,
-    borderColor: COLORS.GRAY_LIGHT,
     elevation: 2,
     shadowColor: COLORS.BLACK,
     shadowOffset: { width: 0, height: 2 },
@@ -349,14 +638,21 @@ const styles = StyleSheet.create({
   productHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 8,
+  },
+  productInfo: {
+    flex: 1,
   },
   productName: {
     fontSize: 18,
     fontWeight: '600',
     color: COLORS.BLACK,
-    flex: 1,
+  },
+  productBrand: {
+    fontSize: 14,
+    color: COLORS.GRAY_MEDIUM,
+    marginTop: 2,
   },
   syncStatus: {
     alignItems: 'center',
@@ -366,6 +662,9 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
   },
+  productDetails: {
+    marginBottom: 12,
+  },
   productCategory: {
     fontSize: 14,
     color: COLORS.GRAY_MEDIUM,
@@ -374,38 +673,47 @@ const styles = StyleSheet.create({
   productExpiry: {
     fontSize: 14,
     color: COLORS.GRAY_DARK,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   productQuantity: {
     fontSize: 14,
     color: COLORS.GRAY_DARK,
-    marginBottom: 8,
+    marginBottom: 2,
+  },
+  productLocation: {
+    fontSize: 12,
+    color: COLORS.GRAY_MEDIUM,
   },
   productFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  productStatus: {
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
     fontSize: 12,
     fontWeight: '600',
+    color: COLORS.WHITE,
   },
   deleteButton: {
-    backgroundColor: COLORS.ERROR,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 4,
+    padding: 8,
   },
   deleteButtonText: {
-    color: COLORS.WHITE,
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 16,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 64,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 16,
   },
   emptyText: {
     fontSize: 18,
@@ -416,6 +724,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.GRAY_MEDIUM,
     textAlign: 'center',
+    marginBottom: 24,
+  },
+  emptyButton: {
+    backgroundColor: COLORS.PRIMARY,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  emptyButtonText: {
+    color: COLORS.WHITE,
+    fontWeight: '600',
   },
   modalContainer: {
     flex: 1,
@@ -426,30 +745,70 @@ const styles = StyleSheet.create({
   modalContent: {
     backgroundColor: COLORS.WHITE,
     borderRadius: 12,
-    padding: 24,
+    padding: 20,
     width: '90%',
-    maxWidth: 400,
+    maxHeight: '80%',
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
     color: COLORS.BLACK,
   },
-  modalInput: {
+  filterSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.GRAY_DARK,
+    marginTop: 16,
+    marginBottom: 12,
+  },
+  filterOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  filterOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: COLORS.GRAY_MEDIUM,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    marginBottom: 16,
+    backgroundColor: COLORS.WHITE,
   },
-  modalButtons: {
+  selectedFilterOption: {
+    backgroundColor: COLORS.PRIMARY,
+    borderColor: COLORS.PRIMARY,
+  },
+  filterOptionText: {
+    fontSize: 14,
+    color: COLORS.GRAY_DARK,
+  },
+  selectedFilterText: {
+    color: COLORS.WHITE,
+    fontWeight: '600',
+  },
+  sortOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.GRAY_LIGHT,
+  },
+  selectedSortOption: {
+    backgroundColor: COLORS.GRAY_LIGHT,
+  },
+  sortOptionText: {
+    fontSize: 16,
+    color: COLORS.BLACK,
+  },
+  selectedSortText: {
+    fontWeight: '600',
+    color: COLORS.PRIMARY,
+  },
+  modalActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 16,
+    marginTop: 20,
   },
   modalButton: {
     flex: 1,
@@ -457,18 +816,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginHorizontal: 8,
   },
-  cancelButton: {
+  clearButton: {
     backgroundColor: COLORS.GRAY_LIGHT,
   },
-  cancelButtonText: {
+  clearButtonText: {
     color: COLORS.GRAY_DARK,
     textAlign: 'center',
     fontWeight: '600',
   },
-  saveButton: {
+  applyButton: {
     backgroundColor: COLORS.PRIMARY,
   },
-  saveButtonText: {
+  applyButtonText: {
     color: COLORS.WHITE,
     textAlign: 'center',
     fontWeight: '600',
