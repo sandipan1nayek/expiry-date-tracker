@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppDispatch } from '../store/hooks';
 import { initializeDatabase, loadProducts } from '../store/thunks/inventoryThunks';
+import { useAuth } from '../contexts/AuthContext';
 import { COLORS } from '../constants';
 
 // Import navigation stacks
@@ -21,41 +21,13 @@ const RootStack = createStackNavigator<RootStackParamList>();
 
 const RootNavigator: React.FC = () => {
   const dispatch = useAppDispatch();
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { isAuthenticated, isLoading } = useAuth();
 
   useEffect(() => {
-    checkAuthState();
-  }, []);
-
-  // Add focus effect to check auth state when the screen comes into focus
-  useFocusEffect(
-    React.useCallback(() => {
-      checkAuthState();
-    }, [])
-  );
-
-  const checkAuthState = async () => {
-    try {
-      const userData = await AsyncStorage.getItem('@user_data');
-      if (userData) {
-        const user = JSON.parse(userData);
-        setIsAuthenticated(user.isAuthenticated || false);
-        
-        // If authenticated, load initial data
-        if (user.isAuthenticated) {
-          await loadInitialData();
-        }
-      } else {
-        setIsAuthenticated(false);
-      }
-    } catch (error) {
-      console.error('Failed to check auth state:', error);
-      setIsAuthenticated(false);
-    } finally {
-      setIsLoading(false);
+    if (isAuthenticated) {
+      loadInitialData();
     }
-  };
+  }, [isAuthenticated]);
 
   const loadInitialData = async () => {
     try {
@@ -81,9 +53,15 @@ const RootNavigator: React.FC = () => {
         headerShown: false,
       }}>
       {isAuthenticated ? (
-        <RootStack.Screen name="Main" component={MainTabNavigator} />
+        <RootStack.Screen 
+          name="Main" 
+          component={MainTabNavigator}
+        />
       ) : (
-        <RootStack.Screen name="Auth" component={AuthStackNavigator} />
+        <RootStack.Screen 
+          name="Auth" 
+          component={AuthStackNavigator}
+        />
       )}
     </RootStack.Navigator>
   );

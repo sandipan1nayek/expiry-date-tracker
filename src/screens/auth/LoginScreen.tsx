@@ -13,13 +13,14 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../../contexts/AuthContext';
 import { COLORS } from '../../constants';
 
 type LoginScreenNavigationProp = StackNavigationProp<any, 'Login'>;
 
 const LoginScreen: React.FC = () => {
   const navigation = useNavigation<LoginScreenNavigationProp>();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -47,7 +48,7 @@ const LoginScreen: React.FC = () => {
       // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 1500));
       
-      // Store user data
+      // Create user data
       const userData = {
         email: email.trim(),
         name: email.split('@')[0],
@@ -55,10 +56,10 @@ const LoginScreen: React.FC = () => {
         isAuthenticated: true,
       };
       
-      await AsyncStorage.setItem('@user_data', JSON.stringify(userData));
+      // Use auth context to login
+      await login(userData);
       
-      // The RootNavigator will automatically detect the auth change and switch to MainTab
-      // No manual navigation needed here
+      // Navigation will be handled automatically by RootNavigator
       
     } catch (error) {
       Alert.alert('Error', 'Login failed. Please try again.');
