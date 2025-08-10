@@ -28,6 +28,7 @@
     "expo-barcode-scanner": "^13.0.1",
     "expo-camera": "^16.1.11",
     "expo-constants": "^17.1.7",
+    "expo-dev-client": "^5.2.4",
     "expo-notifications": "^0.31.4",
     "expo-permissions": "^14.4.0",
     "expo-sqlite": "^15.2.14",

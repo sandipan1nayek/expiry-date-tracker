@@ -32,7 +32,22 @@
     },
     "jsEngine": "jsc",
     "plugins": [
-      "expo-sqlite"
-    ]
+      "expo-sqlite",
+      "expo-dev-client",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#ffffff",
+          "sounds": []
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "b8e01754-f61c-4772-83e8-4d773b40a06e"
+      }
+    },
+    "owner": "sandipan1nayek"
   }
 }
