@@ -24,7 +24,8 @@ import {
 } from '../../store/thunks/inventoryThunks';
 import { setSearchQuery } from '../../store/slices/inventorySlice';
 import { COLORS, ROUTES, SORT_OPTIONS } from '../../constants';
-import { LocalProduct } from '../../types';
+import SettingsService from '../../services/SettingsService';
+import { LocalProduct, ExpirySettings } from '../../types';
 
 type InventoryListScreenNavigationProp = StackNavigationProp<any, 'InventoryList'>;
 
@@ -53,7 +54,17 @@ const InventoryListScreen: React.FC = () => {
 
   useFocusEffect(
     useCallback(() => {
-      handleLoadProducts();
+      const loadData = async () => {
+        await handleLoadProducts();
+        // Reload thresholds in case they changed in settings
+        try {
+          const thresholds = await SettingsService.getExpiryThresholds();
+          setExpiryThresholds(thresholds);
+        } catch (error) {
+          console.error('Failed to load expiry thresholds:', error);
+        }
+      };
+      loadData();
     }, [])
   );
 
@@ -76,6 +87,23 @@ const InventoryListScreen: React.FC = () => {
     setRefreshing(false);
   };
 
+  // State for dynamic thresholds
+  const [expiryThresholds, setExpiryThresholds] = useState<ExpirySettings>({ warningDays: 7, expiringDays: 3 });
+
+  // Load settings on component mount
+  useEffect(() => {
+    const loadThresholds = async () => {
+      try {
+        const thresholds = await SettingsService.getExpiryThresholds();
+        setExpiryThresholds(thresholds);
+      } catch (error) {
+        console.error('Failed to load expiry thresholds:', error);
+      }
+    };
+    loadThresholds();
+  }, []);
+
+  // Get expiry status using dynamic thresholds
   const getExpiryStatus = (expiryDate: string) => {
     const today = new Date();
     const expiry = new Date(expiryDate);
@@ -83,8 +111,8 @@ const InventoryListScreen: React.FC = () => {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
     if (diffDays < 0) return { status: 'Expired', color: COLORS.EXPIRED, days: Math.abs(diffDays) };
-    if (diffDays <= 3) return { status: 'Expiring Soon', color: COLORS.EXPIRING_SOON, days: diffDays };
-    if (diffDays <= 7) return { status: 'Warning', color: COLORS.WARNING, days: diffDays };
+    if (diffDays <= expiryThresholds.expiringDays) return { status: 'Expiring Soon', color: COLORS.EXPIRING_SOON, days: diffDays };
+    if (diffDays <= expiryThresholds.warningDays) return { status: 'Warning', color: COLORS.WARNING, days: diffDays };
     return { status: 'Fresh', color: COLORS.FRESH, days: diffDays };
   };
 

@@ -16,7 +16,6 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { loadProducts } from '../../store/thunks/inventoryThunks';
 import { COLORS } from '../../constants';
 import { LocalProduct } from '../../types';
-import DatabaseService from '../../services/DatabaseService';
 
 const { width } = Dimensions.get('window');
 
@@ -26,7 +25,6 @@ interface DashboardStats {
   totalProducts: number;
   expiredProducts: number;
   expiringSoonProducts: number;
-  warningProducts: number;
   freshProducts: number;
   categoriesUsed: number;
   recentlyAdded: LocalProduct[];
@@ -78,13 +76,12 @@ const ProfileScreen: React.FC = () => {
     setRefreshing(false);
   };
 
-  const calculateDashboardStats = async () => {
+  const calculateDashboardStats = () => {
     if (!products.length) {
       setDashboardStats({
         totalProducts: 0,
         expiredProducts: 0,
         expiringSoonProducts: 0,
-        warningProducts: 0,
         freshProducts: 0,
         categoriesUsed: 0,
         recentlyAdded: [],
@@ -93,43 +90,60 @@ const ProfileScreen: React.FC = () => {
       return;
     }
 
-    try {
-      // Get stats from database service (now includes custom settings)
-      const dbStats = await DatabaseService.getDashboardStats();
-      
-      // Get recently added products (last 7 days)
-      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      const recentlyAdded = products
-        .filter(product => new Date(product.createdAt) > weekAgo)
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        .slice(0, 5);
+    const today = new Date();
+    let expired = 0;
+    let expiringSoon = 0;
+    let fresh = 0;
+    const categories = new Map<string, number>();
 
-      const stats: DashboardStats = {
-        totalProducts: dbStats.total,
-        expiredProducts: dbStats.expired,
-        expiringSoonProducts: dbStats.expiring,
-        warningProducts: dbStats.warning || 0,
-        freshProducts: dbStats.fresh,
-        categoriesUsed: Object.keys(dbStats.categories).length,
-        recentlyAdded,
-      };
+    products.forEach(product => {
+      // Calculate expiry status
+      const expiryDate = new Date(product.expiryDate);
+      const diffTime = expiryDate.getTime() - today.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-      setDashboardStats(stats);
+      if (diffDays < 0) {
+        expired++;
+      } else if (diffDays <= 7) {
+        expiringSoon++;
+      } else {
+        fresh++;
+      }
 
-      // Calculate category breakdown
-      const breakdown: CategoryBreakdown[] = Object.entries(dbStats.categories)
-        .map(([category, count], index) => ({
-          category,
-          count: count as number,
-          percentage: Math.round(((count as number) / dbStats.total) * 100),
-          color: chartColors[index % chartColors.length],
-        }))
-        .sort((a, b) => b.count - a.count);
+      // Count categories
+      const category = product.category || 'Unknown';
+      categories.set(category, (categories.get(category) || 0) + 1);
+    });
 
-      setCategoryBreakdown(breakdown);
-    } catch (error) {
-      console.error('Failed to calculate dashboard stats:', error);
-    }
+    // Get recently added products (last 7 days)
+    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const recentlyAdded = products
+      .filter(product => new Date(product.createdAt) > weekAgo)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 5);
+
+    const stats: DashboardStats = {
+      totalProducts: products.length,
+      expiredProducts: expired,
+      expiringSoonProducts: expiringSoon,
+      freshProducts: fresh,
+      categoriesUsed: categories.size,
+      recentlyAdded,
+    };
+
+    setDashboardStats(stats);
+
+    // Calculate category breakdown
+    const breakdown: CategoryBreakdown[] = Array.from(categories.entries())
+      .map(([category, count], index) => ({
+        category,
+        count,
+        percentage: Math.round((count / products.length) * 100),
+        color: chartColors[index % chartColors.length],
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    setCategoryBreakdown(breakdown);
   };
 
   const renderStatsCard = (title: string, value: string | number, color: string) => (
@@ -209,12 +223,6 @@ const ProfileScreen: React.FC = () => {
           <Text style={styles.welcomeText}>Welcome back!</Text>
           <Text style={styles.userName}>Offline User</Text>
         </View>
-        <TouchableOpacity 
-          style={styles.settingsButton}
-          onPress={() => navigation.navigate('Settings')}
-        >
-          <Text style={styles.settingsButtonText}>⚙️</Text>
-        </TouchableOpacity>
       </View>
 
       {dashboardStats && (
@@ -223,8 +231,7 @@ const ProfileScreen: React.FC = () => {
           <View style={styles.statsGrid}>
             {renderStatsCard('Total Products', dashboardStats.totalProducts, COLORS.PRIMARY)}
             {renderStatsCard('Expired', dashboardStats.expiredProducts, COLORS.ERROR)}
-            {renderStatsCard('Expiring Soon', dashboardStats.expiringSoonProducts, '#FF8800')}
-            {renderStatsCard('Warning', dashboardStats.warningProducts, COLORS.WARNING)}
+            {renderStatsCard('Expiring Soon', dashboardStats.expiringSoonProducts, COLORS.WARNING)}
             {renderStatsCard('Fresh Items', dashboardStats.freshProducts, COLORS.SUCCESS)}
           </View>
 
@@ -319,7 +326,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     width: (width - 48) / 2,
-    minHeight: 80,
   },
   statsValue: {
     fontSize: 32,
@@ -449,14 +455,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
-  },
-  settingsButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#f0f0f0',
-  },
-  settingsButtonText: {
-    fontSize: 20,
   },
 });
 

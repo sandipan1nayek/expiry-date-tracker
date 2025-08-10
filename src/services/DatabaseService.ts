@@ -88,7 +88,7 @@ class DatabaseService {
       return await AsyncStorageService.getDashboardStats();
     } catch (error) {
       console.error('Failed to get dashboard stats:', error);
-      return { total: 0, expired: 0, expiring: 0, fresh: 0, categories: {} };
+      return { total: 0, expired: 0, expiring: 0, warning: 0, fresh: 0, categories: {} };
     }
   }
 
@@ -97,6 +97,43 @@ class DatabaseService {
       await AsyncStorageService.clearAllProducts();
     } catch (error) {
       console.error('Failed to clear all products:', error);
+    }
+  }
+
+  // New methods that use user's custom settings
+  async getExpiredProductsWithSettings(): Promise<LocalProduct[]> {
+    try {
+      return await AsyncStorageService.getExpiredProductsWithSettings();
+    } catch (error) {
+      console.error('Failed to get expired products with settings:', error);
+      return [];
+    }
+  }
+
+  async getExpiringProductsWithSettings(): Promise<LocalProduct[]> {
+    try {
+      return await AsyncStorageService.getExpiringProductsWithSettings();
+    } catch (error) {
+      console.error('Failed to get expiring products with settings:', error);
+      return [];
+    }
+  }
+
+  async getWarningProductsWithSettings(): Promise<LocalProduct[]> {
+    try {
+      return await AsyncStorageService.getWarningProductsWithSettings();
+    } catch (error) {
+      console.error('Failed to get warning products with settings:', error);
+      return [];
+    }
+  }
+
+  async getFreshProductsWithSettings(): Promise<LocalProduct[]> {
+    try {
+      return await AsyncStorageService.getFreshProductsWithSettings();
+    } catch (error) {
+      console.error('Failed to get fresh products with settings:', error);
+      return [];
     }
   }
 }

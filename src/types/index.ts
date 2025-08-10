@@ -113,3 +113,21 @@ export interface SyncStatus {
   isOnline: boolean;
   isSyncing: boolean;
 }
+
+// Settings types
+export interface ExpirySettings {
+  warningDays: number;    // Days before expiry to show warning (yellow)
+  expiringDays: number;   // Days before expiry to show as expiring soon (orange/red)
+}
+
+export interface AppSettings {
+  expiryThresholds: ExpirySettings;
+  notifications: {
+    enabled: boolean;
+    reminderDays: number[];
+  };
+  theme: 'light' | 'dark' | 'auto';
+  language: string;
+}
+
+export type ProductStatus = 'expired' | 'expiring' | 'warning' | 'fresh';

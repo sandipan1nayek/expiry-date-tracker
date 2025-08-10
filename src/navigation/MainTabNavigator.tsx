@@ -10,11 +10,12 @@ import ProductDetailScreen from '../screens/inventory/ProductDetailScreen';
 import ScannerScreen from '../screens/scanner/ScannerScreen';
 import ExpiryDateScannerScreen from '../screens/scanner/ExpiryDateScannerScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
+import SettingsScreen from '../screens/settings/SettingsScreen';
 
 export type MainTabParamList = {
   InventoryTab: undefined;
   Scanner: undefined;
-  Profile: undefined;
+  ProfileTab: undefined;
 };
 
 export type InventoryStackParamList = {
@@ -24,8 +25,14 @@ export type InventoryStackParamList = {
   ExpiryDateScanner: { onDateScanned?: (date: string) => void };
 };
 
+export type ProfileStackParamList = {
+  Profile: undefined;
+  Settings: undefined;
+};
+
 const MainTab = createBottomTabNavigator<MainTabParamList>();
 const InventoryStack = createStackNavigator<InventoryStackParamList>();
+const ProfileStack = createStackNavigator<ProfileStackParamList>();
 
 const InventoryStackNavigator: React.FC = () => {
   return (
@@ -54,6 +61,23 @@ const InventoryStackNavigator: React.FC = () => {
   );
 };
 
+const ProfileStackNavigator: React.FC = () => {
+  return (
+    <ProfileStack.Navigator>
+      <ProfileStack.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{ title: 'Dashboard', headerShown: false }}
+      />
+      <ProfileStack.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{ title: 'Settings' }}
+      />
+    </ProfileStack.Navigator>
+  );
+};
+
 const MainTabNavigator: React.FC = () => {
   return (
     <MainTab.Navigator
@@ -77,8 +101,8 @@ const MainTabNavigator: React.FC = () => {
         }}
       />
       <MainTab.Screen
-        name="Profile"
-        component={ProfileScreen}
+        name="ProfileTab"
+        component={ProfileStackNavigator}
         options={{
           title: 'Profile',
         }}

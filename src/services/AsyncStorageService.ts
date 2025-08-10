@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LocalProduct } from '../types';
+import SettingsService from './SettingsService';
 
 // Simple AsyncStorage-based database service for reliable offline functionality
 class AsyncStorageService {
@@ -169,6 +170,7 @@ class AsyncStorageService {
     total: number;
     expired: number;
     expiring: number;
+    warning: number;
     fresh: number;
     categories: { [key: string]: number };
   }> {
@@ -176,42 +178,130 @@ class AsyncStorageService {
       const products = await this.getAllProducts();
       
       if (products.length === 0) {
-        return { total: 0, expired: 0, expiring: 0, fresh: 0, categories: {} };
+        return { total: 0, expired: 0, expiring: 0, warning: 0, fresh: 0, categories: {} };
       }
-
-      const today = new Date().toISOString().split('T')[0];
-      const weekFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
       let expired = 0;
       let expiring = 0;
+      let warning = 0;
       let fresh = 0;
       const categories: { [key: string]: number } = {};
 
-      products.forEach(product => {
+      // Get user's custom thresholds
+      const thresholds = await SettingsService.getExpiryThresholds();
+
+      for (const product of products) {
         // Count categories
         const category = product.category || 'Unknown';
         categories[category] = (categories[category] || 0) + 1;
 
-        // Count expiry status
-        if (product.expiryDate < today) {
-          expired++;
-        } else if (product.expiryDate <= weekFromNow) {
-          expiring++;
-        } else {
-          fresh++;
+        // Use settings-based categorization
+        const status = await SettingsService.categorizeProduct(product.expiryDate);
+        
+        switch (status) {
+          case 'expired':
+            expired++;
+            break;
+          case 'expiring':
+            expiring++;
+            break;
+          case 'warning':
+            warning++;
+            break;
+          case 'fresh':
+            fresh++;
+            break;
         }
-      });
+      }
 
       return {
         total: products.length,
         expired,
         expiring,
+        warning,
         fresh,
         categories
       };
     } catch (error) {
       console.error('Error getting dashboard stats:', error);
-      return { total: 0, expired: 0, expiring: 0, fresh: 0, categories: {} };
+      return { total: 0, expired: 0, expiring: 0, warning: 0, fresh: 0, categories: {} };
+    }
+  }
+
+  // New methods that use SettingsService for categorization
+  async getExpiredProductsWithSettings(): Promise<LocalProduct[]> {
+    try {
+      const products = await this.getAllProducts();
+      const expiredProducts: LocalProduct[] = [];
+      
+      for (const product of products) {
+        const status = await SettingsService.categorizeProduct(product.expiryDate);
+        if (status === 'expired') {
+          expiredProducts.push(product);
+        }
+      }
+      
+      return expiredProducts;
+    } catch (error) {
+      console.error('Error getting expired products with settings:', error);
+      return [];
+    }
+  }
+
+  async getExpiringProductsWithSettings(): Promise<LocalProduct[]> {
+    try {
+      const products = await this.getAllProducts();
+      const expiringProducts: LocalProduct[] = [];
+      
+      for (const product of products) {
+        const status = await SettingsService.categorizeProduct(product.expiryDate);
+        if (status === 'expiring') {
+          expiringProducts.push(product);
+        }
+      }
+      
+      return expiringProducts;
+    } catch (error) {
+      console.error('Error getting expiring products with settings:', error);
+      return [];
+    }
+  }
+
+  async getWarningProductsWithSettings(): Promise<LocalProduct[]> {
+    try {
+      const products = await this.getAllProducts();
+      const warningProducts: LocalProduct[] = [];
+      
+      for (const product of products) {
+        const status = await SettingsService.categorizeProduct(product.expiryDate);
+        if (status === 'warning') {
+          warningProducts.push(product);
+        }
+      }
+      
+      return warningProducts;
+    } catch (error) {
+      console.error('Error getting warning products with settings:', error);
+      return [];
+    }
+  }
+
+  async getFreshProductsWithSettings(): Promise<LocalProduct[]> {
+    try {
+      const products = await this.getAllProducts();
+      const freshProducts: LocalProduct[] = [];
+      
+      for (const product of products) {
+        const status = await SettingsService.categorizeProduct(product.expiryDate);
+        if (status === 'fresh') {
+          freshProducts.push(product);
+        }
+      }
+      
+      return freshProducts;
+    } catch (error) {
+      console.error('Error getting fresh products with settings:', error);
+      return [];
     }
   }
 
