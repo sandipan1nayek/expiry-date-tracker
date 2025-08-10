@@ -38,16 +38,9 @@ export const addProductThunk = createAsyncThunk(
   'inventory/addProduct',
   async (productData: Omit<LocalProduct, 'localId' | 'syncStatus' | 'createdAt' | 'updatedAt'>, { rejectWithValue, getState }) => {
     try {
-      const state = getState() as RootState;
-      const userId = state.auth.user?.id;
-      
-      if (!userId) {
-        return rejectWithValue('User not authenticated');
-      }
-
       const result = await SyncService.addProduct({
         ...productData,
-        userId,
+        userId: 'offline-user',
       });
 
       if (!result.success) {

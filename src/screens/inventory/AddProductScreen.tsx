@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { addProductThunk as addProduct } from '../../store/thunks/inventoryThunks';
 import { COLORS, PRODUCT_CATEGORIES } from '../../constants';
@@ -23,7 +24,6 @@ const AddProductScreen: React.FC = () => {
   const navigation = useNavigation<AddProductScreenNavigationProp>();
   const dispatch = useAppDispatch();
   const { isLoading } = useAppSelector(state => state.inventory);
-  const { user } = useAppSelector(state => state.auth);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -117,7 +117,7 @@ const AddProductScreen: React.FC = () => {
         notes: formData.notes.trim() || undefined,
         barcode: formData.barcode.trim() || undefined,
         isFinished: false,
-        userId: user?.id || 'demo-user-123',
+        userId: 'offline-user',
       };
 
       await dispatch(addProduct(productData)).unwrap();
@@ -260,13 +260,25 @@ const AddProductScreen: React.FC = () => {
 
         <View style={styles.fieldContainer}>
           <Text style={styles.fieldLabel}>Expiry Date * (YYYY-MM-DD)</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.expiryDate}
-            onChangeText={(text) => setFormData({ ...formData, expiryDate: text })}
-            placeholder="2025-12-31"
-            placeholderTextColor={COLORS.GRAY_MEDIUM}
-          />
+          <View style={styles.inputWithButton}>
+            <TextInput
+              style={[styles.input, styles.inputWithButtonField]}
+              value={formData.expiryDate}
+              onChangeText={(text) => setFormData({ ...formData, expiryDate: text })}
+              placeholder="2025-12-31"
+              placeholderTextColor={COLORS.GRAY_MEDIUM}
+            />
+            <TouchableOpacity
+              style={styles.scanButton}
+              onPress={() => navigation.navigate('ExpiryDateScanner', {
+                onDateScanned: (date: string) => {
+                  setFormData({ ...formData, expiryDate: date });
+                }
+              })}
+            >
+              <MaterialIcons name="camera-alt" size={20} color={COLORS.PRIMARY} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.fieldContainer}>
@@ -524,6 +536,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.PRIMARY,
     fontWeight: '600',
+  },
+  inputWithButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  inputWithButtonField: {
+    flex: 1,
+    marginRight: 10,
+  },
+  scanButton: {
+    backgroundColor: COLORS.GRAY_LIGHT,
+    borderRadius: 8,
+    padding: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.PRIMARY,
   },
 });
 

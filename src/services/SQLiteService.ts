@@ -7,6 +7,7 @@ class SQLiteService {
 
   async initDatabase(): Promise<void> {
     try {
+      // Use the correct Expo SQLite API
       this.database = await SQLite.openDatabaseAsync(this.databaseName);
       console.log('Database opened successfully');
       await this.createTables();
@@ -22,31 +23,19 @@ class SQLiteService {
     }
 
     try {
-      await this.database.execAsync(`
+      // Simple table creation - split into smaller operations
+      const createProductsTable = `
         CREATE TABLE IF NOT EXISTS products (
           localId TEXT PRIMARY KEY,
-          id TEXT,
           name TEXT NOT NULL,
-          brand TEXT,
           category TEXT NOT NULL,
-          barcode TEXT,
           expiryDate TEXT NOT NULL,
-          purchaseDate TEXT,
-          price REAL,
           quantity INTEGER DEFAULT 1,
-          unit TEXT DEFAULT 'piece',
-          location TEXT,
-          notes TEXT,
-          imageUrl TEXT,
-          isFinished INTEGER DEFAULT 0,
-          syncStatus TEXT DEFAULT 'pending',
-          lastSyncAt TEXT,
-          createdAt TEXT NOT NULL,
-          updatedAt TEXT NOT NULL,
-          userId TEXT
-        )
-      `);
+          createdAt TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+      `;
 
+      await this.database.execAsync(createProductsTable);
       console.log('Database tables created successfully');
     } catch (error) {
       console.error('Error creating tables:', error);
@@ -62,32 +51,15 @@ class SQLiteService {
     try {
       const result = await this.database.runAsync(
         `INSERT INTO products (
-          localId, id, name, brand, category, barcode, expiryDate, 
-          purchaseDate, price, quantity, unit, location, notes, 
-          imageUrl, isFinished, syncStatus, lastSyncAt, createdAt, 
-          updatedAt, userId
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          localId, name, category, expiryDate, quantity, createdAt
+        ) VALUES (?, ?, ?, ?, ?, ?)`,
         [
           product.localId,
-          product.id || null,
           product.name,
-          product.brand || null,
           product.category,
-          product.barcode || null,
           product.expiryDate,
-          product.purchaseDate || null,
-          product.price || null,
-          product.quantity,
-          product.unit,
-          product.location || null,
-          product.notes || null,
-          product.imageUrl || null,
-          product.isFinished ? 1 : 0,
-          product.syncStatus,
-          product.lastSyncAt || null,
-          product.createdAt,
-          product.updatedAt,
-          product.userId || null,
+          product.quantity || 1,
+          new Date().toISOString(),
         ]
       );
 
@@ -122,25 +94,26 @@ class SQLiteService {
       const row = rows[i];
       products.push({
         localId: row.localId,
-        id: row.id,
         name: row.name,
-        brand: row.brand,
         category: row.category,
-        barcode: row.barcode,
         expiryDate: row.expiryDate,
-        purchaseDate: row.purchaseDate,
-        price: row.price,
-        quantity: row.quantity,
-        unit: row.unit,
-        location: row.location,
-        notes: row.notes,
-        imageUrl: row.imageUrl,
-        isFinished: row.isFinished === 1,
-        syncStatus: row.syncStatus as 'synced' | 'pending' | 'error',
-        lastSyncAt: row.lastSyncAt,
+        quantity: row.quantity || 1,
         createdAt: row.createdAt,
-        updatedAt: row.updatedAt,
-        userId: row.userId,
+        // Set default values for missing fields
+        id: row.localId,
+        brand: '',
+        barcode: '',
+        purchaseDate: '',
+        price: 0,
+        unit: 'piece',
+        location: '',
+        notes: '',
+        imageUrl: '',
+        isFinished: false,
+        syncStatus: 'synced' as const,
+        lastSyncAt: undefined,
+        updatedAt: row.createdAt,
+        userId: '',
       });
     }
 

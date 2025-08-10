@@ -7,6 +7,7 @@ import InventoryListScreen from '../screens/inventory/InventoryListScreen';
 import AddProductScreen from '../screens/inventory/AddProductScreen';
 import ProductDetailScreen from '../screens/inventory/ProductDetailScreen';
 import ScannerScreen from '../screens/scanner/ScannerScreen';
+import ExpiryDateScannerScreen from '../screens/scanner/ExpiryDateScannerScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
 
 export type MainTabParamList = {
@@ -19,6 +20,7 @@ export type InventoryStackParamList = {
   InventoryList: undefined;
   AddProduct: undefined;
   ProductDetail: { productId: string };
+  ExpiryDateScanner: { onDateScanned?: (date: string) => void };
 };
 
 const MainTab = createBottomTabNavigator<MainTabParamList>();
@@ -41,6 +43,11 @@ const InventoryStackNavigator: React.FC = () => {
         name="ProductDetail"
         component={ProductDetailScreen}
         options={{ title: 'Product Details' }}
+      />
+      <InventoryStack.Screen
+        name="ExpiryDateScanner"
+        component={ExpiryDateScannerScreen}
+        options={{ title: 'Scan Expiry Date', headerShown: false }}
       />
     </InventoryStack.Navigator>
   );

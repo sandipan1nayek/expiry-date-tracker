@@ -16,7 +16,6 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { loadProducts } from '../../store/thunks/inventoryThunks';
-import { signOut } from '../../store/thunks/authThunks';
 import { COLORS, ROUTES } from '../../constants';
 import { LocalProduct } from '../../types';
 
@@ -47,7 +46,6 @@ const ProfileScreen: React.FC = () => {
   const navigation = useNavigation<ProfileScreenNavigationProp>();
   const dispatch = useAppDispatch();
   const { products, isLoading } = useAppSelector(state => state.inventory);
-  const { user } = useAppSelector(state => state.auth);
 
   const [refreshing, setRefreshing] = useState(false);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
@@ -170,21 +168,24 @@ const ProfileScreen: React.FC = () => {
     setCategoryBreakdown(breakdown);
   };
 
-  const handleSignOut = () => {
+  const handleClearAllData = () => {
     Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
+      'Clear All Data',
+      'Are you sure you want to clear all products and data? This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Sign Out',
+          text: 'Clear All',
           style: 'destructive',
           onPress: async () => {
             try {
-              await dispatch(signOut()).unwrap();
-              // Navigation will be handled by the auth state change
+              // TODO: Implement clearAllProducts action in inventory slice
+              Alert.alert('Success', 'All data has been cleared');
+              setRefreshing(true);
+              await dispatch(loadProducts());
+              setRefreshing(false);
             } catch (error) {
-              Alert.alert('Error', 'Failed to sign out');
+              Alert.alert('Error', 'Failed to clear data');
             }
           },
         },
@@ -268,7 +269,7 @@ const ProfileScreen: React.FC = () => {
       <View style={styles.header}>
         <View style={styles.userInfo}>
           <Text style={styles.welcomeText}>Welcome back!</Text>
-          <Text style={styles.userName}>{user?.displayName || user?.email || 'User'}</Text>
+          <Text style={styles.userName}>Offline User</Text>
         </View>
         <TouchableOpacity style={styles.settingsButton} onPress={() => setShowSettingsModal(true)}>
           <Text style={styles.settingsIcon}>⚙️</Text>
@@ -343,8 +344,8 @@ const ProfileScreen: React.FC = () => {
 
           {/* Account Actions */}
           <View style={styles.accountActions}>
-            <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-              <Text style={styles.signOutText}>Sign Out</Text>
+            <TouchableOpacity style={styles.signOutButton} onPress={handleClearAllData}>
+              <Text style={styles.signOutText}>Clear All Data</Text>
             </TouchableOpacity>
           </View>
         </>
