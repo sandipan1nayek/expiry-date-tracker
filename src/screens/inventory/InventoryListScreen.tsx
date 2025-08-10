@@ -45,7 +45,6 @@ const InventoryListScreen: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   
   // Modal states
-  const [showFilterModal, setShowFilterModal] = useState(false);
   const [showSortModal, setShowSortModal] = useState(false);
 
   useEffect(() => {
@@ -199,6 +198,16 @@ const InventoryListScreen: React.FC = () => {
     );
   };
 
+  const handleStatusFilter = (status: string) => {
+    if (filterStatus === status) {
+      // If already selected, clear the filter
+      setFilterStatus('All');
+    } else {
+      // Set the new filter
+      setFilterStatus(status);
+    }
+  };
+
   const getUniqueCategories = () => {
     const categories = products.map(p => p.category);
     return ['All', ...Array.from(new Set(categories))];
@@ -273,76 +282,6 @@ const InventoryListScreen: React.FC = () => {
       </TouchableOpacity>
     );
   };
-
-  const renderFilterModal = () => (
-    <Modal visible={showFilterModal} animationType="slide" transparent>
-      <View style={styles.modalContainer}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Filter Products</Text>
-
-          <Text style={styles.filterSectionTitle}>Category</Text>
-          <View style={styles.filterOptions}>
-            {getUniqueCategories().map(category => (
-              <TouchableOpacity
-                key={category}
-                style={[
-                  styles.filterOption,
-                  filterCategory === category && styles.selectedFilterOption
-                ]}
-                onPress={() => setFilterCategory(category)}
-              >
-                <Text style={[
-                  styles.filterOptionText,
-                  filterCategory === category && styles.selectedFilterText
-                ]}>
-                  {category}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <Text style={styles.filterSectionTitle}>Status</Text>
-          <View style={styles.filterOptions}>
-            {Object.entries(getStatusCounts()).map(([status, count]) => (
-              <TouchableOpacity
-                key={status}
-                style={[
-                  styles.filterOption,
-                  filterStatus === status && styles.selectedFilterOption
-                ]}
-                onPress={() => setFilterStatus(status)}
-              >
-                <Text style={[
-                  styles.filterOptionText,
-                  filterStatus === status && styles.selectedFilterText
-                ]}>
-                  {status} ({String(count)})
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <View style={styles.modalActions}>
-            <TouchableOpacity
-              style={[styles.modalButton, styles.clearButton]}
-              onPress={() => {
-                setFilterCategory('All');
-                setFilterStatus('All');
-              }}
-            >
-              <Text style={styles.clearButtonText}>Clear All</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modalButton, styles.applyButton]}
-              onPress={() => setShowFilterModal(false)}
-            >
-              <Text style={styles.applyButtonText}>Apply</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
 
   const renderSortModal = () => (
     <Modal visible={showSortModal} animationType="slide" transparent>
@@ -443,12 +382,6 @@ const InventoryListScreen: React.FC = () => {
         <View style={styles.actionButtons}>
           <TouchableOpacity
             style={styles.controlButton}
-            onPress={() => setShowFilterModal(true)}
-          >
-            <Text style={styles.controlButtonText}>Filter</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.controlButton}
             onPress={() => setShowSortModal(true)}
           >
             <Text style={styles.controlButtonText}>Sort</Text>
@@ -459,22 +392,62 @@ const InventoryListScreen: React.FC = () => {
       {/* Quick Stats */}
       {products.length > 0 && (
         <View style={styles.statsContainer}>
-          <View style={[styles.statCard, { backgroundColor: COLORS.EXPIRED }]}>
+          <TouchableOpacity 
+            style={[
+              styles.statCard, 
+              { backgroundColor: COLORS.EXPIRED },
+              filterStatus === 'Expired' && styles.selectedStatCard
+            ]}
+            onPress={() => handleStatusFilter('Expired')}
+          >
             <Text style={styles.statNumber}>{String(getStatusCounts().Expired)}</Text>
             <Text style={styles.statLabel}>Expired</Text>
-          </View>
-          <View style={[styles.statCard, { backgroundColor: COLORS.EXPIRING_SOON }]}>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[
+              styles.statCard, 
+              { backgroundColor: COLORS.EXPIRING_SOON },
+              filterStatus === 'Expiring Soon' && styles.selectedStatCard
+            ]}
+            onPress={() => handleStatusFilter('Expiring Soon')}
+          >
             <Text style={styles.statNumber}>{String(getStatusCounts()['Expiring Soon'])}</Text>
             <Text style={styles.statLabel}>Expiring</Text>
-          </View>
-          <View style={[styles.statCard, { backgroundColor: COLORS.WARNING }]}>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[
+              styles.statCard, 
+              { backgroundColor: COLORS.WARNING },
+              filterStatus === 'Warning' && styles.selectedStatCard
+            ]}
+            onPress={() => handleStatusFilter('Warning')}
+          >
             <Text style={styles.statNumber}>{String(getStatusCounts().Warning)}</Text>
             <Text style={styles.statLabel}>Warning</Text>
-          </View>
-          <View style={[styles.statCard, { backgroundColor: COLORS.FRESH }]}>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[
+              styles.statCard, 
+              { backgroundColor: COLORS.FRESH },
+              filterStatus === 'Fresh' && styles.selectedStatCard
+            ]}
+            onPress={() => handleStatusFilter('Fresh')}
+          >
             <Text style={styles.statNumber}>{String(getStatusCounts().Fresh)}</Text>
             <Text style={styles.statLabel}>Fresh</Text>
-          </View>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Active Filter Indicator */}
+      {filterStatus !== 'All' && (
+        <View style={styles.filterIndicator}>
+          <Text style={styles.filterIndicatorText}>
+            Showing {filterStatus} products only
+          </Text>
+          <TouchableOpacity onPress={() => setFilterStatus('All')}>
+            <Text style={styles.clearFilterText}>Clear Filter</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -525,7 +498,6 @@ const InventoryListScreen: React.FC = () => {
       )}
 
       {/* Modals */}
-      {renderFilterModal()}
       {renderSortModal()}
     </View>
   );
@@ -614,6 +586,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
   },
+  selectedStatCard: {
+    borderWidth: 3,
+    borderColor: COLORS.WHITE,
+    transform: [{ scale: 0.95 }],
+  },
   statNumber: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -623,6 +600,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.WHITE,
     marginTop: 2,
+  },
+  filterIndicator: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#E3F2FD',
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 8,
+  },
+  filterIndicatorText: {
+    fontSize: 14,
+    color: COLORS.PRIMARY,
+    fontWeight: '500',
+  },
+  clearFilterText: {
+    fontSize: 14,
+    color: COLORS.PRIMARY,
+    fontWeight: 'bold',
+    textDecorationLine: 'underline',
   },
   errorContainer: {
     backgroundColor: COLORS.ERROR,
