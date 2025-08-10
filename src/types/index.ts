@@ -131,3 +131,113 @@ export interface AppSettings {
 }
 
 export type ProductStatus = 'expired' | 'expiring' | 'warning' | 'fresh';
+
+// Medicine types
+export interface Medicine {
+  id: string;
+  name: string;
+  brand?: string;
+  dosage: string; // e.g., "500mg", "10ml"
+  form: MedicineForm; // tablet, capsule, syrup, etc.
+  totalQuantity: number; // Total tablets/doses available
+  remainingQuantity: number; // Current stock
+  expiryDate: string;
+  purchaseDate?: string;
+  batchNumber?: string;
+  notes?: string;
+  isActive: boolean; // Whether currently being taken
+  createdAt: string;
+  updatedAt: string;
+  userId: string;
+}
+
+export interface LocalMedicine extends Omit<Medicine, 'id'> {
+  localId: string;
+  id?: string; // Firebase ID when synced
+  syncStatus: 'synced' | 'pending' | 'error';
+  lastSyncAt?: string;
+}
+
+export type MedicineForm = 
+  | 'tablet' 
+  | 'capsule' 
+  | 'syrup' 
+  | 'injection' 
+  | 'drops' 
+  | 'cream' 
+  | 'ointment' 
+  | 'inhaler' 
+  | 'other';
+
+export interface MedicineIntake {
+  id: string;
+  medicineId: string;
+  scheduledTime: string; // ISO string
+  actualTime?: string; // ISO string when actually taken
+  quantity: number; // How many tablets/doses
+  status: IntakeStatus;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LocalMedicineIntake extends Omit<MedicineIntake, 'id'> {
+  localId: string;
+  id?: string;
+  syncStatus: 'synced' | 'pending' | 'error';
+  lastSyncAt?: string;
+}
+
+export type IntakeStatus = 'scheduled' | 'taken' | 'missed' | 'skipped';
+
+export interface MedicineSchedule {
+  id: string;
+  medicineId: string;
+  frequency: ScheduleFrequency;
+  times: string[]; // Array of time strings like ["08:00", "20:00"]
+  startDate: string;
+  endDate?: string; // Optional end date
+  isActive: boolean;
+  reminderEnabled: boolean;
+  reminderMinutesBefore: number; // Minutes before scheduled time to remind
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LocalMedicineSchedule extends Omit<MedicineSchedule, 'id'> {
+  localId: string;
+  id?: string;
+  syncStatus: 'synced' | 'pending' | 'error';
+  lastSyncAt?: string;
+}
+
+export type ScheduleFrequency = 
+  | 'once' 
+  | 'daily' 
+  | 'twice_daily' 
+  | 'three_times_daily' 
+  | 'four_times_daily' 
+  | 'weekly' 
+  | 'custom';
+
+export interface MedicineReminder {
+  id: string;
+  medicineId: string;
+  scheduleId: string;
+  reminderTime: string; // ISO string
+  notificationId?: string; // Local notification ID
+  isActive: boolean;
+  createdAt: string;
+}
+
+// Medicine form options
+export interface MedicineFormData {
+  name: string;
+  brand?: string;
+  dosage: string;
+  form: MedicineForm;
+  totalQuantity: number;
+  expiryDate: string;
+  batchNumber?: string;
+  notes?: string;
+}
