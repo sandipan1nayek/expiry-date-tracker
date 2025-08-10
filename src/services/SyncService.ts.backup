@@ -35,31 +35,34 @@ class SyncService {
 
   async addProduct(productData: Omit<LocalProduct, 'localId' | 'syncStatus' | 'createdAt' | 'updatedAt'>): Promise<SyncResult<LocalProduct>> {
     try {
-      await DatabaseService.initDatabase();
+      await SQLiteService.initDatabase();
       
       const now = new Date().toISOString();
       const product: LocalProduct = {
         ...productData,
         localId: generateUUID(),
-        syncStatus: 'synced', // For demo purposes, immediately synced
+        syncStatus: 'pending',
         createdAt: now,
         updatedAt: now,
       };
 
-      const productId = await DatabaseService.insertProduct(product);
-      const savedProduct = { ...product, localId: productId };
-      console.log('Product inserted successfully:', savedProduct.name);
+      await SQLiteService.insertProduct(product);
+      console.log('Product inserted successfully:', product.name);
       
       // Schedule notifications for expiry reminders
       try {
-        await NotificationService.scheduleMultipleReminders(savedProduct);
+        await NotificationService.scheduleMultipleReminders(product);
       } catch (error) {
         console.warn('Failed to schedule notifications:', error);
       }
       
+      // Mark as synced for demo purposes
+      await SQLiteService.markProductAsSynced(product.localId);
+      console.log('Product marked as synced');
+      
       return {
         success: true,
-        data: savedProduct,
+        data: product,
       };
     } catch (error: any) {
       return {
@@ -71,13 +74,10 @@ class SyncService {
 
   async updateProduct(localId: string, updates: Partial<LocalProduct>): Promise<SyncResult<LocalProduct>> {
     try {
-      await DatabaseService.initDatabase();
-      await DatabaseService.updateProduct(localId, updates);
+      await SQLiteService.initDatabase();
+      await SQLiteService.updateProduct(localId, updates);
       
-      // Get the updated product
-      const allProducts = await DatabaseService.getAllProducts();
-      const updatedProduct = allProducts.find(p => p.localId === localId);
-      
+      const updatedProduct = await SQLiteService.getProductById(localId);
       if (!updatedProduct) {
         return {
           success: false,
@@ -109,7 +109,7 @@ class SyncService {
 
   async deleteProduct(localId: string): Promise<SyncResult<void>> {
     try {
-      await DatabaseService.initDatabase();
+      await SQLiteService.initDatabase();
       
       // Cancel any scheduled notifications for this product
       try {
@@ -118,7 +118,7 @@ class SyncService {
         console.warn('Failed to cancel notifications:', error);
       }
       
-      await DatabaseService.deleteProduct(localId);
+      await SQLiteService.deleteProduct(localId);
       
       return {
         success: true,
@@ -133,8 +133,8 @@ class SyncService {
 
   async searchProducts(query: string): Promise<SyncResult<LocalProduct[]>> {
     try {
-      await DatabaseService.initDatabase();
-      const products = await DatabaseService.searchProducts(query);
+      await SQLiteService.initDatabase();
+      const products = await SQLiteService.searchProducts(query);
       
       return {
         success: true,
@@ -150,8 +150,8 @@ class SyncService {
 
   async getExpiredProducts(): Promise<SyncResult<LocalProduct[]>> {
     try {
-      await DatabaseService.initDatabase();
-      const products = await DatabaseService.getExpiredProducts();
+      await SQLiteService.initDatabase();
+      const products = await SQLiteService.getExpiredProducts();
       
       return {
         success: true,
@@ -167,8 +167,8 @@ class SyncService {
 
   async getExpiringProducts(days: number = 7): Promise<SyncResult<LocalProduct[]>> {
     try {
-      await DatabaseService.initDatabase();
-      const products = await DatabaseService.getExpiringProducts(days);
+      await SQLiteService.initDatabase();
+      const products = await SQLiteService.getExpiringProducts(days);
       
       return {
         success: true,
@@ -184,8 +184,8 @@ class SyncService {
 
   async getProductsByCategory(category: string): Promise<SyncResult<LocalProduct[]>> {
     try {
-      await DatabaseService.initDatabase();
-      const products = await DatabaseService.getProductsByCategory(category);
+      await SQLiteService.initDatabase();
+      const products = await SQLiteService.getProductsByCategory(category);
       
       return {
         success: true,
@@ -201,13 +201,12 @@ class SyncService {
 
   async getProductById(localId: string): Promise<SyncResult<LocalProduct | null>> {
     try {
-      await DatabaseService.initDatabase();
-      const allProducts = await DatabaseService.getAllProducts();
-      const product = allProducts.find(p => p.localId === localId);
+      await SQLiteService.initDatabase();
+      const product = await SQLiteService.getProductById(localId);
       
       return {
         success: true,
-        data: product || null,
+        data: product,
       };
     } catch (error: any) {
       return {
@@ -219,13 +218,12 @@ class SyncService {
 
   async getPendingSyncProducts(): Promise<SyncResult<LocalProduct[]>> {
     try {
-      await DatabaseService.initDatabase();
-      const allProducts = await DatabaseService.getAllProducts();
-      const pendingProducts = allProducts.filter(p => p.syncStatus === 'pending');
+      await SQLiteService.initDatabase();
+      const products = await SQLiteService.getPendingSyncProducts();
       
       return {
         success: true,
-        data: pendingProducts,
+        data: products,
       };
     } catch (error: any) {
       return {
@@ -237,18 +235,8 @@ class SyncService {
 
   async markProductAsSynced(localId: string, cloudId?: string): Promise<SyncResult<void>> {
     try {
-      await DatabaseService.initDatabase();
-      const updateData: Partial<LocalProduct> = { 
-        syncStatus: 'synced',
-        updatedAt: new Date().toISOString()
-      };
-      
-      // If we had a cloud ID, we would store it in the id field
-      if (cloudId) {
-        updateData.id = cloudId;
-      }
-      
-      await DatabaseService.updateProduct(localId, updateData);
+      await SQLiteService.initDatabase();
+      await SQLiteService.markProductAsSynced(localId, cloudId);
       
       return {
         success: true,
@@ -266,7 +254,7 @@ class SyncService {
     errors: string[]; 
   }>> {
     try {
-      await DatabaseService.initDatabase();
+      await SQLiteService.initDatabase();
       const pendingResult = await this.getPendingSyncProducts();
       if (!pendingResult.success || !pendingResult.data) {
         return {
@@ -283,7 +271,7 @@ class SyncService {
 
       for (const product of pendingProducts) {
         try {
-          await this.markProductAsSynced(product.localId);
+          await SQLiteService.markProductAsSynced(product.localId);
           syncedCount++;
         } catch (error: any) {
           errors.push(`Failed to sync ${product.name}: ${error.message}`);
@@ -307,12 +295,12 @@ class SyncService {
 
   async getSyncStatus(): Promise<SyncStatus> {
     try {
-      await DatabaseService.initDatabase();
+      await SQLiteService.initDatabase();
       const pendingResult = await this.getPendingSyncProducts();
       const pendingCount = pendingResult.success && pendingResult.data ? pendingResult.data.length : 0;
       
       return {
-        isOnline: true, // For demo purposes
+        isOnline: true, // For demo purposes - always offline
         lastSyncAt: new Date().toISOString(),
         pendingChanges: pendingCount,
         syncInProgress: false,
@@ -329,8 +317,8 @@ class SyncService {
 
   async clearAllProducts(): Promise<SyncResult<void>> {
     try {
-      await DatabaseService.initDatabase();
-      await DatabaseService.clearAllProducts();
+      await SQLiteService.initDatabase();
+      await SQLiteService.clearAllProducts();
       
       // Cancel all notifications
       try {

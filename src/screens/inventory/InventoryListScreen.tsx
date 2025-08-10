@@ -232,7 +232,7 @@ const InventoryListScreen: React.FC = () => {
             <Text style={styles.statusText}>
               {expiryInfo.status}
               {expiryInfo.status === 'Expired' ? ` (${expiryInfo.days}d ago)` : 
-               expiryInfo.status !== 'Fresh' ? ` (${expiryInfo.days}d)` : ''}
+               expiryInfo.status !== 'Fresh' ? ` (${expiryInfo.days}d)` : null}
             </Text>
           </View>
           <TouchableOpacity
@@ -288,7 +288,7 @@ const InventoryListScreen: React.FC = () => {
                   styles.filterOptionText,
                   filterStatus === status && styles.selectedFilterText
                 ]}>
-                  {status} ({count})
+                  {status} ({String(count)})
                 </Text>
               </TouchableOpacity>
             ))}
@@ -432,19 +432,19 @@ const InventoryListScreen: React.FC = () => {
       {products.length > 0 && (
         <View style={styles.statsContainer}>
           <View style={[styles.statCard, { backgroundColor: COLORS.EXPIRED }]}>
-            <Text style={styles.statNumber}>{getStatusCounts().Expired}</Text>
+            <Text style={styles.statNumber}>{String(getStatusCounts().Expired)}</Text>
             <Text style={styles.statLabel}>Expired</Text>
           </View>
           <View style={[styles.statCard, { backgroundColor: COLORS.EXPIRING_SOON }]}>
-            <Text style={styles.statNumber}>{getStatusCounts()['Expiring Soon']}</Text>
+            <Text style={styles.statNumber}>{String(getStatusCounts()['Expiring Soon'])}</Text>
             <Text style={styles.statLabel}>Expiring</Text>
           </View>
           <View style={[styles.statCard, { backgroundColor: COLORS.WARNING }]}>
-            <Text style={styles.statNumber}>{getStatusCounts().Warning}</Text>
+            <Text style={styles.statNumber}>{String(getStatusCounts().Warning)}</Text>
             <Text style={styles.statLabel}>Warning</Text>
           </View>
           <View style={[styles.statCard, { backgroundColor: COLORS.FRESH }]}>
-            <Text style={styles.statNumber}>{getStatusCounts().Fresh}</Text>
+            <Text style={styles.statNumber}>{String(getStatusCounts().Fresh)}</Text>
             <Text style={styles.statLabel}>Fresh</Text>
           </View>
         </View>

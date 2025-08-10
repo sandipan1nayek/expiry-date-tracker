@@ -7,8 +7,6 @@ import {
   TouchableOpacity,
   RefreshControl,
   Alert,
-  Modal,
-  TextInput,
   ActivityIndicator,
   Dimensions,
 } from 'react-native';
@@ -16,7 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { loadProducts } from '../../store/thunks/inventoryThunks';
-import { COLORS, ROUTES } from '../../constants';
+import { COLORS } from '../../constants';
 import { LocalProduct } from '../../types';
 
 const { width } = Dimensions.get('window');
@@ -27,11 +25,8 @@ interface DashboardStats {
   totalProducts: number;
   expiredProducts: number;
   expiringSoonProducts: number;
-  warningProducts: number;
   freshProducts: number;
-  totalValue: number;
   categoriesUsed: number;
-  averageDaysToExpiry: number;
   recentlyAdded: LocalProduct[];
 }
 
@@ -50,29 +45,26 @@ const ProfileScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [categoryBreakdown, setCategoryBreakdown] = useState<CategoryBreakdown[]>([]);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [userSettings, setUserSettings] = useState({
-    notifications: true,
-    autoBackup: true,
-    warningDays: '7',
-    criticalDays: '3',
-  });
 
   // Chart colors for categories
   const chartColors = [
     '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', 
     '#DDA0DD', '#FFB347', '#87CEEB', '#F0E68C', '#FFA07A',
-    '#98D8C8', '#F7DC6F', '#BB8FCE'
   ];
 
   useEffect(() => {
     loadDashboardData();
+  }, []);
+
+  useEffect(() => {
+    if (products.length >= 0) {
+      calculateDashboardStats();
+    }
   }, [products]);
 
   const loadDashboardData = async () => {
     try {
       await dispatch(loadProducts()).unwrap();
-      calculateDashboardStats();
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
     }
@@ -90,11 +82,8 @@ const ProfileScreen: React.FC = () => {
         totalProducts: 0,
         expiredProducts: 0,
         expiringSoonProducts: 0,
-        warningProducts: 0,
         freshProducts: 0,
-        totalValue: 0,
         categoriesUsed: 0,
-        averageDaysToExpiry: 0,
         recentlyAdded: [],
       });
       setCategoryBreakdown([]);
@@ -104,10 +93,7 @@ const ProfileScreen: React.FC = () => {
     const today = new Date();
     let expired = 0;
     let expiringSoon = 0;
-    let warning = 0;
     let fresh = 0;
-    let totalValue = 0;
-    let totalDaysToExpiry = 0;
     const categories = new Map<string, number>();
 
     products.forEach(product => {
@@ -118,19 +104,14 @@ const ProfileScreen: React.FC = () => {
 
       if (diffDays < 0) {
         expired++;
-      } else if (diffDays <= 3) {
-        expiringSoon++;
       } else if (diffDays <= 7) {
-        warning++;
+        expiringSoon++;
       } else {
         fresh++;
       }
 
-      totalDaysToExpiry += Math.max(0, diffDays);
-      totalValue += product.price || 0;
-
       // Count categories
-      const category = product.category;
+      const category = product.category || 'Unknown';
       categories.set(category, (categories.get(category) || 0) + 1);
     });
 
@@ -145,11 +126,8 @@ const ProfileScreen: React.FC = () => {
       totalProducts: products.length,
       expiredProducts: expired,
       expiringSoonProducts: expiringSoon,
-      warningProducts: warning,
       freshProducts: fresh,
-      totalValue,
       categoriesUsed: categories.size,
-      averageDaysToExpiry: Math.round(totalDaysToExpiry / products.length) || 0,
       recentlyAdded,
     };
 
@@ -168,36 +146,10 @@ const ProfileScreen: React.FC = () => {
     setCategoryBreakdown(breakdown);
   };
 
-  const handleClearAllData = () => {
-    Alert.alert(
-      'Clear All Data',
-      'Are you sure you want to clear all products and data? This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Clear All',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // TODO: Implement clearAllProducts action in inventory slice
-              Alert.alert('Success', 'All data has been cleared');
-              setRefreshing(true);
-              await dispatch(loadProducts());
-              setRefreshing(false);
-            } catch (error) {
-              Alert.alert('Error', 'Failed to clear data');
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const renderStatsCard = (title: string, value: string | number, color: string, subtitle?: string) => (
+  const renderStatsCard = (title: string, value: string | number, color: string) => (
     <View style={[styles.statsCard, { borderLeftColor: color }]}>
-      <Text style={styles.statsValue}>{value}</Text>
+      <Text style={styles.statsValue}>{String(value)}</Text>
       <Text style={styles.statsTitle}>{title}</Text>
-      {subtitle && <Text style={styles.statsSubtitle}>{subtitle}</Text>}
     </View>
   );
 
@@ -213,8 +165,8 @@ const ProfileScreen: React.FC = () => {
               <View style={styles.chartRow}>
                 <View style={[styles.colorIndicator, { backgroundColor: item.color }]} />
                 <Text style={styles.categoryLabel}>{item.category}</Text>
-                <Text style={styles.categoryCount}>{item.count}</Text>
-                <Text style={styles.categoryPercentage}>({item.percentage}%)</Text>
+                <Text style={styles.categoryCount}>{String(item.count)}</Text>
+                <Text style={styles.categoryPercentage}>({String(item.percentage)}%)</Text>
               </View>
             </View>
           ))}
@@ -229,7 +181,7 @@ const ProfileScreen: React.FC = () => {
     return (
       <View style={styles.activityContainer}>
         <Text style={styles.sectionTitle}>Recently Added</Text>
-        {dashboardStats.recentlyAdded.map((product, index) => (
+        {dashboardStats.recentlyAdded.map((product) => (
           <TouchableOpacity
             key={product.localId}
             style={styles.activityItem}
@@ -251,9 +203,9 @@ const ProfileScreen: React.FC = () => {
     );
   };
 
-  if (!dashboardStats && !isLoading) {
+  if (isLoading && !dashboardStats) {
     return (
-      <View style={styles.container}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.PRIMARY} />
         <Text style={styles.loadingText}>Loading dashboard...</Text>
       </View>
@@ -271,9 +223,6 @@ const ProfileScreen: React.FC = () => {
           <Text style={styles.welcomeText}>Welcome back!</Text>
           <Text style={styles.userName}>Offline User</Text>
         </View>
-        <TouchableOpacity style={styles.settingsButton} onPress={() => setShowSettingsModal(true)}>
-          <Text style={styles.settingsIcon}>⚙️</Text>
-        </TouchableOpacity>
       </View>
 
       {dashboardStats && (
@@ -286,141 +235,31 @@ const ProfileScreen: React.FC = () => {
             {renderStatsCard('Fresh Items', dashboardStats.freshProducts, COLORS.SUCCESS)}
           </View>
 
-          {/* Secondary Stats */}
+          {/* Categories Used */}
           <View style={styles.secondaryStats}>
-            {renderStatsCard(
-              'Total Value', 
-              `$${dashboardStats.totalValue.toFixed(2)}`, 
-              COLORS.INFO,
-              'Estimated inventory value'
-            )}
-            {renderStatsCard(
-              'Categories Used', 
-              dashboardStats.categoriesUsed, 
-              COLORS.SECONDARY,
-              'Product categories'
-            )}
-            {renderStatsCard(
-              'Avg. Days to Expiry', 
-              dashboardStats.averageDaysToExpiry, 
-              COLORS.INFO,
-              'Average across all items'
-            )}
+            {renderStatsCard('Categories Used', dashboardStats.categoriesUsed, COLORS.SECONDARY)}
           </View>
 
-          {/* Quick Actions */}
-          <View style={styles.quickActions}>
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
-            <View style={styles.actionButtons}>
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => navigation.navigate('InventoryTab', { screen: 'AddProduct' })}
-              >
-                <Text style={styles.actionIcon}>➕</Text>
-                <Text style={styles.actionText}>Add Product</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => navigation.navigate('Scanner')}
-              >
-                <Text style={styles.actionIcon}>📷</Text>
-                <Text style={styles.actionText}>Scan Barcode</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => navigation.navigate('InventoryTab')}
-              >
-                <Text style={styles.actionIcon}>📋</Text>
-                <Text style={styles.actionText}>View All</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Category Breakdown Chart */}
+          {/* Category Chart */}
           {renderCategoryChart()}
 
           {/* Recent Activity */}
           {renderRecentActivity()}
-
-          {/* Account Actions */}
-          <View style={styles.accountActions}>
-            <TouchableOpacity style={styles.signOutButton} onPress={handleClearAllData}>
-              <Text style={styles.signOutText}>Clear All Data</Text>
-            </TouchableOpacity>
-          </View>
         </>
       )}
 
-      {/* Settings Modal */}
-      <Modal visible={showSettingsModal} animationType="slide" transparent>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Settings</Text>
-              <TouchableOpacity onPress={() => setShowSettingsModal(false)}>
-                <Text style={styles.closeButton}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.settingsForm}>
-              <View style={styles.settingItem}>
-                <Text style={styles.settingLabel}>Expiry Warning (days)</Text>
-                <TextInput
-                  style={styles.settingInput}
-                  value={userSettings.warningDays}
-                  onChangeText={(text) => setUserSettings({ ...userSettings, warningDays: text })}
-                  keyboardType="numeric"
-                />
-              </View>
-
-              <View style={styles.settingItem}>
-                <Text style={styles.settingLabel}>Critical Alert (days)</Text>
-                <TextInput
-                  style={styles.settingInput}
-                  value={userSettings.criticalDays}
-                  onChangeText={(text) => setUserSettings({ ...userSettings, criticalDays: text })}
-                  keyboardType="numeric"
-                />
-              </View>
-
-              <TouchableOpacity
-                style={[styles.settingToggle, userSettings.notifications && styles.settingToggleActive]}
-                onPress={() => setUserSettings({ 
-                  ...userSettings, 
-                  notifications: !userSettings.notifications 
-                })}
-              >
-                <Text style={styles.settingToggleText}>
-                  {userSettings.notifications ? '🔔' : '🔕'} Push Notifications
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.settingToggle, userSettings.autoBackup && styles.settingToggleActive]}
-                onPress={() => setUserSettings({ 
-                  ...userSettings, 
-                  autoBackup: !userSettings.autoBackup 
-                })}
-              >
-                <Text style={styles.settingToggleText}>
-                  {userSettings.autoBackup ? '💾' : '📝'} Auto Backup
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity
-              style={styles.saveButton}
-              onPress={() => {
-                // Save settings logic would go here
-                Alert.alert('Success', 'Settings saved successfully');
-                setShowSettingsModal(false);
-              }}
-            >
-              <Text style={styles.saveButtonText}>Save Settings</Text>
-            </TouchableOpacity>
-          </View>
+      {!dashboardStats && !isLoading && (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyStateText}>No products yet!</Text>
+          <Text style={styles.emptyStateSubtext}>Add your first product to get started</Text>
+          <TouchableOpacity 
+            style={styles.addButton}
+            onPress={() => navigation.navigate('InventoryTab', { screen: 'AddProduct' })}
+          >
+            <Text style={styles.addButtonText}>Add Product</Text>
+          </TouchableOpacity>
         </View>
-      </Modal>
+      )}
     </ScrollView>
   );
 };
@@ -428,118 +267,94 @@ const ProfileScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.GRAY_LIGHT,
+    backgroundColor: '#f5f5f5',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  loadingText: {
+    textAlign: 'center',
+    marginTop: 16,
+    color: '#666',
+    fontSize: 16,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingVertical: 20,
-    backgroundColor: COLORS.WHITE,
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.GRAY_LIGHT,
+    borderBottomColor: '#eee',
   },
   userInfo: {
     flex: 1,
   },
   welcomeText: {
     fontSize: 16,
-    color: COLORS.GRAY_MEDIUM,
+    color: '#666',
   },
   userName: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: COLORS.BLACK,
-    marginTop: 4,
-  },
-  settingsButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.GRAY_LIGHT,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  settingsIcon: {
-    fontSize: 20,
+    color: '#333',
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     paddingHorizontal: 16,
     paddingTop: 16,
+    justifyContent: 'space-between',
   },
   secondaryStats: {
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingTop: 8,
   },
   statsCard: {
-    backgroundColor: COLORS.WHITE,
+    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
-    margin: 4,
-    width: (width - 40) / 2 - 8,
+    marginBottom: 16,
     borderLeftWidth: 4,
     elevation: 2,
-    shadowColor: COLORS.BLACK,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    width: (width - 48) / 2,
   },
   statsValue: {
-    fontSize: 24,
+    fontSize: 32,
     fontWeight: 'bold',
-    color: COLORS.BLACK,
+    color: '#333',
     marginBottom: 4,
   },
   statsTitle: {
     fontSize: 14,
-    color: COLORS.GRAY_MEDIUM,
-    fontWeight: '600',
-  },
-  statsSubtitle: {
-    fontSize: 12,
-    color: COLORS.GRAY_MEDIUM,
-    marginTop: 2,
-  },
-  quickActions: {
-    backgroundColor: COLORS.WHITE,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 12,
-    padding: 16,
+    color: '#666',
+    fontWeight: '500',
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: COLORS.BLACK,
+    color: '#333',
     marginBottom: 16,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  actionButton: {
-    alignItems: 'center',
-    flex: 1,
-    paddingVertical: 12,
-  },
-  actionIcon: {
-    fontSize: 24,
-    marginBottom: 8,
-  },
-  actionText: {
-    fontSize: 14,
-    color: COLORS.GRAY_DARK,
-    fontWeight: '600',
   },
   chartContainer: {
-    backgroundColor: COLORS.WHITE,
-    marginHorizontal: 16,
-    marginBottom: 16,
+    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
+    marginHorizontal: 16,
+    marginTop: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   chartContent: {
     marginTop: 8,
@@ -552,33 +367,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   colorIndicator: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     marginRight: 12,
   },
   categoryLabel: {
     flex: 1,
     fontSize: 16,
-    color: COLORS.BLACK,
+    color: '#333',
   },
   categoryCount: {
     fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.GRAY_DARK,
+    fontWeight: 'bold',
+    color: '#333',
     marginRight: 8,
   },
   categoryPercentage: {
     fontSize: 14,
-    color: COLORS.GRAY_MEDIUM,
-    minWidth: 40,
+    color: '#666',
+    minWidth: 50,
+    textAlign: 'right',
   },
   activityContainer: {
-    backgroundColor: COLORS.WHITE,
-    marginHorizontal: 16,
-    marginBottom: 16,
+    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 32,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   activityItem: {
     flexDirection: 'row',
@@ -586,117 +408,51 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.GRAY_LIGHT,
+    borderBottomColor: '#f0f0f0',
   },
   activityInfo: {
     flex: 1,
   },
   activityProduct: {
     fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.BLACK,
+    fontWeight: '500',
+    color: '#333',
   },
   activityDate: {
     fontSize: 14,
-    color: COLORS.GRAY_MEDIUM,
+    color: '#666',
     marginTop: 2,
   },
   activityCategory: {
     fontSize: 14,
     color: COLORS.PRIMARY,
-    fontWeight: '600',
+    fontWeight: '500',
   },
-  accountActions: {
-    paddingHorizontal: 16,
-    paddingBottom: 32,
-  },
-  signOutButton: {
-    backgroundColor: COLORS.ERROR,
-    borderRadius: 8,
-    paddingVertical: 12,
+  emptyState: {
     alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 32,
   },
-  signOutText: {
-    color: COLORS.WHITE,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: COLORS.GRAY_DARK,
-    textAlign: 'center',
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: COLORS.WHITE,
-    borderRadius: 12,
-    padding: 20,
-    width: '90%',
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 20,
+  emptyStateText: {
+    fontSize: 24,
     fontWeight: 'bold',
-    color: COLORS.BLACK,
-  },
-  closeButton: {
-    fontSize: 20,
-    color: COLORS.GRAY_DARK,
-  },
-  settingsForm: {
-    marginBottom: 20,
-  },
-  settingItem: {
-    marginBottom: 16,
-  },
-  settingLabel: {
-    fontSize: 16,
-    color: COLORS.GRAY_DARK,
+    color: '#333',
     marginBottom: 8,
   },
-  settingInput: {
-    borderWidth: 1,
-    borderColor: COLORS.GRAY_MEDIUM,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+  emptyStateSubtext: {
     fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
   },
-  settingToggle: {
-    backgroundColor: COLORS.GRAY_LIGHT,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginBottom: 12,
-  },
-  settingToggleActive: {
-    backgroundColor: COLORS.PRIMARY,
-  },
-  settingToggleText: {
-    fontSize: 16,
-    color: COLORS.BLACK,
-    fontWeight: '600',
-  },
-  saveButton: {
+  addButton: {
     backgroundColor: COLORS.PRIMARY,
     borderRadius: 8,
+    paddingHorizontal: 24,
     paddingVertical: 12,
-    alignItems: 'center',
   },
-  saveButtonText: {
-    color: COLORS.WHITE,
+  addButtonText: {
+    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },

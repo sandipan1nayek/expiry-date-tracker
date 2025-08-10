@@ -1,4 +1,5 @@
 import React from 'react';
+import { Text } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 
@@ -66,7 +67,6 @@ const MainTabNavigator: React.FC = () => {
         component={InventoryStackNavigator}
         options={{
           title: 'Inventory',
-          // TODO: Add tab bar icon
         }}
       />
       <MainTab.Screen
@@ -74,7 +74,6 @@ const MainTabNavigator: React.FC = () => {
         component={ScannerScreen}
         options={{
           title: 'Scanner',
-          // TODO: Add tab bar icon
         }}
       />
       <MainTab.Screen
@@ -82,7 +81,6 @@ const MainTabNavigator: React.FC = () => {
         component={ProfileScreen}
         options={{
           title: 'Profile',
-          // TODO: Add tab bar icon
         }}
       />
     </MainTab.Navigator>

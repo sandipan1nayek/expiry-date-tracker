@@ -1,6 +1,5 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
-import SyncService from '../../services/SyncService';
-import SQLiteService from '../../services/SQLiteService';
+import DatabaseService from '../../services/DatabaseService';
 import { LocalProduct } from '../../types';
 import { RootState } from '../store';
 
@@ -9,7 +8,7 @@ export const initializeDatabase = createAsyncThunk(
   'inventory/initializeDatabase',
   async (_, { rejectWithValue }) => {
     try {
-      await SQLiteService.initDatabase();
+      await DatabaseService.initDatabase();
       return true;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to initialize database');
@@ -22,11 +21,8 @@ export const loadProducts = createAsyncThunk(
   'inventory/loadProducts',
   async (_, { rejectWithValue }) => {
     try {
-      const result = await SyncService.getAllProducts();
-      if (!result.success) {
-        return rejectWithValue(result.error || 'Failed to load products');
-      }
-      return result.data!;
+      const products = await DatabaseService.getAllProducts();
+      return products;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to load products');
     }
@@ -36,18 +32,25 @@ export const loadProducts = createAsyncThunk(
 // Add new product
 export const addProductThunk = createAsyncThunk(
   'inventory/addProduct',
-  async (productData: Omit<LocalProduct, 'localId' | 'syncStatus' | 'createdAt' | 'updatedAt'>, { rejectWithValue, getState }) => {
+  async (productData: Partial<LocalProduct>, { rejectWithValue }) => {
     try {
-      const result = await SyncService.addProduct({
+      const localId = await DatabaseService.insertProduct({
         ...productData,
         userId: 'offline-user',
+        syncStatus: 'synced',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       });
 
-      if (!result.success) {
-        return rejectWithValue(result.error || 'Failed to add product');
+      // Return the complete product
+      const products = await DatabaseService.getAllProducts();
+      const newProduct = products.find(p => p.localId === localId);
+      
+      if (!newProduct) {
+        throw new Error('Failed to retrieve added product');
       }
 
-      return result.data!;
+      return newProduct;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to add product');
     }
@@ -59,11 +62,12 @@ export const updateProductThunk = createAsyncThunk(
   'inventory/updateProduct',
   async ({ localId, updates }: { localId: string; updates: Partial<LocalProduct> }, { rejectWithValue }) => {
     try {
-      const result = await SyncService.updateProduct(localId, updates);
-      if (!result.success) {
-        return rejectWithValue(result.error || 'Failed to update product');
-      }
-      return { localId, updates: result.data! };
+      await DatabaseService.updateProduct(localId, {
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      });
+      
+      return { localId, updates };
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to update product');
     }
@@ -75,10 +79,7 @@ export const deleteProductThunk = createAsyncThunk(
   'inventory/deleteProduct',
   async (localId: string, { rejectWithValue }) => {
     try {
-      const result = await SyncService.deleteProduct(localId);
-      if (!result.success) {
-        return rejectWithValue(result.error || 'Failed to delete product');
-      }
+      await DatabaseService.deleteProduct(localId);
       return localId;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to delete product');
@@ -92,14 +93,12 @@ export const searchProductsThunk = createAsyncThunk(
   async (query: string, { rejectWithValue }) => {
     try {
       if (!query.trim()) {
-        return [];
+        const allProducts = await DatabaseService.getAllProducts();
+        return allProducts;
       }
 
-      const result = await SyncService.searchProducts(query);
-      if (!result.success) {
-        return rejectWithValue(result.error || 'Failed to search products');
-      }
-      return result.data!;
+      const products = await DatabaseService.searchProducts(query);
+      return products;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to search products');
     }
@@ -111,11 +110,8 @@ export const getExpiredProductsThunk = createAsyncThunk(
   'inventory/getExpiredProducts',
   async (_, { rejectWithValue }) => {
     try {
-      const result = await SyncService.getExpiredProducts();
-      if (!result.success) {
-        return rejectWithValue(result.error || 'Failed to get expired products');
-      }
-      return result.data!;
+      const products = await DatabaseService.getExpiredProducts();
+      return products;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to get expired products');
     }
@@ -127,11 +123,8 @@ export const getExpiringProductsThunk = createAsyncThunk(
   'inventory/getExpiringProducts',
   async (days: number = 7, { rejectWithValue }) => {
     try {
-      const result = await SyncService.getExpiringProducts(days);
-      if (!result.success) {
-        return rejectWithValue(result.error || 'Failed to get expiring products');
-      }
-      return result.data!;
+      const products = await DatabaseService.getExpiringProducts(days);
+      return products;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to get expiring products');
     }
@@ -143,39 +136,23 @@ export const getProductsByCategoryThunk = createAsyncThunk(
   'inventory/getProductsByCategory',
   async (category: string, { rejectWithValue }) => {
     try {
-      const result = await SyncService.getProductsByCategory(category);
-      if (!result.success) {
-        return rejectWithValue(result.error || 'Failed to get products by category');
-      }
-      return result.data!;
+      const products = await DatabaseService.getProductsByCategory(category);
+      return products;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to get products by category');
     }
   }
 );
 
-// Perform full sync
-export const performFullSyncThunk = createAsyncThunk(
-  'inventory/performFullSync',
+// Get dashboard data
+export const loadDashboardDataThunk = createAsyncThunk(
+  'inventory/loadDashboardData',
   async (_, { rejectWithValue }) => {
     try {
-      const result = await SyncService.performFullSync();
-      return result;
+      const stats = await DatabaseService.getDashboardStats();
+      return stats;
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Sync failed');
-    }
-  }
-);
-
-// Get sync status
-export const getSyncStatusThunk = createAsyncThunk(
-  'inventory/getSyncStatus',
-  async (_, { rejectWithValue }) => {
-    try {
-      const status = await SyncService.getSyncStatus();
-      return status;
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to get sync status');
+      return rejectWithValue(error.message || 'Failed to load dashboard data');
     }
   }
 );
@@ -185,14 +162,10 @@ export const markProductAsFinishedThunk = createAsyncThunk(
   'inventory/markProductAsFinished',
   async ({ localId, isFinished }: { localId: string; isFinished: boolean }, { rejectWithValue }) => {
     try {
-      const result = await SyncService.updateProduct(localId, { 
+      await DatabaseService.updateProduct(localId, { 
         isFinished,
         updatedAt: new Date().toISOString(),
       });
-      
-      if (!result.success) {
-        return rejectWithValue(result.error || 'Failed to update product');
-      }
       
       return { localId, isFinished };
     } catch (error: any) {
@@ -207,20 +180,17 @@ export const bulkDeleteProductsThunk = createAsyncThunk(
   async (localIds: string[], { rejectWithValue }) => {
     try {
       const results = await Promise.allSettled(
-        localIds.map(localId => SyncService.deleteProduct(localId))
+        localIds.map(localId => DatabaseService.deleteProduct(localId))
       );
 
       const successfulDeletes: string[] = [];
       const errors: string[] = [];
 
       results.forEach((result, index) => {
-        if (result.status === 'fulfilled' && result.value.success) {
+        if (result.status === 'fulfilled') {
           successfulDeletes.push(localIds[index]);
         } else {
-          const error = result.status === 'rejected' 
-            ? result.reason 
-            : (result.value as any).error;
-          errors.push(`Failed to delete product: ${error}`);
+          errors.push(`Failed to delete product: ${result.reason}`);
         }
       });
 
@@ -236,13 +206,10 @@ export const exportProductsThunk = createAsyncThunk(
   'inventory/exportProducts',
   async (_, { rejectWithValue }) => {
     try {
-      const result = await SyncService.getAllProducts();
-      if (!result.success) {
-        return rejectWithValue(result.error || 'Failed to export products');
-      }
+      const products = await DatabaseService.getAllProducts();
 
       const exportData = {
-        products: result.data,
+        products: products,
         exportedAt: new Date().toISOString(),
         version: '1.0',
       };
