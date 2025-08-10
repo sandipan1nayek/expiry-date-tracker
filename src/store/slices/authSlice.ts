@@ -70,7 +70,7 @@ const authSlice = createSlice({
       })
       .addCase(signIn.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.user = action.payload.user;
+        state.user = action.payload;
         state.isAuthenticated = true;
         state.error = null;
         state.isInitialized = true;
@@ -90,7 +90,7 @@ const authSlice = createSlice({
       })
       .addCase(signUp.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.user = action.payload.user;
+        state.user = action.payload;
         state.isAuthenticated = true;
         state.error = null;
         state.isInitialized = true;

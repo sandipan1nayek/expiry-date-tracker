@@ -1,0 +1,122 @@
+import { auth, firestore } from '../config/firebase.expo';
+// Firebase types disabled for Expo compatibility
+// import { FirebaseAuthTypes } from '@react-native-firebase/auth';
+// import { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
+
+// Mock types for Expo compatibility
+interface MockUserCredential {
+  user: MockUser;
+}
+
+interface MockUser {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  emailVerified: boolean;
+}
+
+export class FirebaseService {
+  // Auth methods - disabled for Expo compatibility
+  static async signInWithEmailAndPassword(email: string, password: string): Promise<MockUserCredential> {
+    return auth().signInWithEmailAndPassword(email, password);
+  }
+
+  static async createUserWithEmailAndPassword(email: string, password: string): Promise<MockUserCredential> {
+    return auth().createUserWithEmailAndPassword(email, password);
+  }
+
+  static async signOut(): Promise<void> {
+    return auth().signOut();
+  }
+
+  static async sendPasswordResetEmail(email: string): Promise<void> {
+    return auth().sendPasswordResetEmail(email);
+  }
+
+  static getCurrentUser(): MockUser | null {
+    return auth().currentUser;
+  }
+
+  static onAuthStateChanged(callback: (user: MockUser | null) => void) {
+    return auth().onAuthStateChanged(callback);
+  }
+
+  // Firestore methods
+  static getFirestore() {
+    return firestore();
+  }
+
+  static collection(path: string): FirebaseFirestoreTypes.CollectionReference {
+    return firestore().collection(path);
+  }
+
+  static doc(path: string): FirebaseFirestoreTypes.DocumentReference {
+    return firestore().doc(path);
+  }
+
+  // Document operations
+  static async addDocument(collectionPath: string, data: any): Promise<FirebaseFirestoreTypes.DocumentReference> {
+    return firestore().collection(collectionPath).add(data);
+  }
+
+  static async setDocument(documentPath: string, data: any): Promise<void> {
+    return firestore().doc(documentPath).set(data);
+  }
+
+  static async updateDocument(collectionPath: string, documentId: string, data: any): Promise<void> {
+    return firestore().collection(collectionPath).doc(documentId).update(data);
+  }
+
+  static async deleteDocument(collectionPath: string, documentId: string): Promise<void> {
+    return firestore().collection(collectionPath).doc(documentId).delete();
+  }
+
+  static async getDocument(collectionPath: string, documentId: string): Promise<FirebaseFirestoreTypes.DocumentSnapshot> {
+    return firestore().collection(collectionPath).doc(documentId).get();
+  }
+
+  static async getCollection(collectionPath: string): Promise<FirebaseFirestoreTypes.QuerySnapshot> {
+    return firestore().collection(collectionPath).get();
+  }
+
+  static async queryDocuments(
+    collectionPath: string,
+    field: string,
+    operator: FirebaseFirestoreTypes.WhereFilterOp,
+    value: any
+  ): Promise<FirebaseFirestoreTypes.QuerySnapshot> {
+    return firestore().collection(collectionPath).where(field, operator, value).get();
+  }
+
+  // Storage methods (will be implemented in Phase 9)
+  /*
+  static getStorage() {
+    return storage();
+  }
+
+  static storageRef(path?: string) {
+    return storage().ref(path);
+  }
+  */
+
+  // Messaging methods (will be implemented in Phase 6)
+  /*
+  static async getMessaging() {
+    return messaging();
+  }
+
+  static async requestPermission(): Promise<boolean> {
+    const authStatus = await messaging().requestPermission();
+    const enabled =
+      authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+      authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+    return enabled;
+  }
+
+  static async getToken(): Promise<string> {
+    return messaging().getToken();
+  }
+  */
+}
+
+export default FirebaseService;

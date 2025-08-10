@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, ReactNode } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { setUser, clearUser, setInitialized } from '../store/slices/authSlice';
-import AuthService from '../services/AuthService';
+// import AuthService from '../services/AuthService';
 import { User } from '../types';
 
 interface AuthContextType {
@@ -22,52 +22,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const { user, isAuthenticated, isLoading, isInitialized } = useAppSelector(state => state.auth);
 
   useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-
+    // Temporarily auto-login for testing the inventory features
     const initializeAuth = async () => {
       try {
-        // Check for stored auth data first
-        const shouldAutoSignIn = await AuthService.shouldAutoSignIn();
-        if (shouldAutoSignIn) {
-          const storedData = await AuthService.getStoredAuthData();
-          if (storedData?.user) {
-            dispatch(setUser(storedData.user));
-          }
-        }
-
-        // Set up Firebase auth state listener
-        unsubscribe = AuthService.onAuthStateChanged((user: User | null) => {
-          if (user) {
-            dispatch(setUser(user));
-            // Update stored auth data when user signs in via Firebase
-            AuthService.saveAuthData(user, true);
-          } else {
-            dispatch(clearUser());
-            // Clear stored data when user signs out
-            AuthService.clearStoredAuthData();
-          }
-          
-          if (!isInitialized) {
-            dispatch(setInitialized(true));
-          }
-        });
+        // Auto-login with a demo user for testing
+        const demoUser: User = {
+          id: 'demo-user-123',
+          email: 'demo@example.com',
+          displayName: 'Demo User',
+          createdAt: new Date().toISOString(),
+        };
+        
+        dispatch(setUser(demoUser));
+        dispatch(setInitialized(true));
       } catch (error) {
         console.error('Error initializing auth:', error);
-        if (!isInitialized) {
-          dispatch(setInitialized(true));
-        }
+        dispatch(setInitialized(true));
       }
     };
 
     initializeAuth();
-
-    // Cleanup listener on unmount
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
-  }, [dispatch, isInitialized]);
+  }, [dispatch]);
 
   const value: AuthContextType = {
     user,

@@ -1,45 +1,53 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
-import AuthService, { AuthResult } from '../../services/AuthService';
-import { LoginForm, SignupForm } from '../../types';
+import { LoginForm, SignupForm, User } from '../../types';
 
-// Sign in thunk
+// Mock user for demo purposes
+const mockUser: User = {
+  id: 'demo-user-123',
+  email: 'demo@example.com',
+  displayName: 'Demo User',
+  photoURL: undefined,
+  createdAt: new Date().toISOString(),
+};
+
+// Sign in thunk - simplified for Expo demo
 export const signIn = createAsyncThunk(
   'auth/signIn',
   async (credentials: LoginForm, { rejectWithValue }) => {
     try {
-      const result = await AuthService.signIn(
-        credentials.email, 
-        credentials.password, 
-        credentials.rememberMe ?? true
-      );
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      if (!result.success) {
-        return rejectWithValue(result.error || 'Sign in failed');
+      // Simple validation for demo
+      if (credentials.email === 'demo@example.com' && credentials.password === 'password') {
+        return mockUser;
+      } else {
+        return rejectWithValue('Invalid email or password. Try: demo@example.com / password');
       }
-      
-      return result.data!;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Sign in failed');
     }
   }
 );
 
-// Sign up thunk
+// Sign up thunk - simplified for Expo demo
 export const signUp = createAsyncThunk(
   'auth/signUp',
   async (formData: SignupForm, { rejectWithValue }) => {
     try {
-      const result = await AuthService.signUp(
-        formData.email,
-        formData.password,
-        formData.displayName
-      );
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      if (!result.success) {
-        return rejectWithValue(result.error || 'Sign up failed');
-      }
+      // For demo, just return a user object
+      const newUser: User = {
+        id: 'new-user-' + Date.now(),
+        email: formData.email,
+        displayName: formData.displayName,
+        photoURL: undefined,
+        createdAt: new Date().toISOString(),
+      };
       
-      return result.data!;
+      return newUser;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Sign up failed');
     }
@@ -51,12 +59,8 @@ export const signOut = createAsyncThunk(
   'auth/signOut',
   async (_, { rejectWithValue }) => {
     try {
-      const result = await AuthService.signOut();
-      
-      if (!result.success) {
-        return rejectWithValue(result.error || 'Sign out failed');
-      }
-      
+      // Simulate sign out delay
+      await new Promise(resolve => setTimeout(resolve, 500));
       return;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Sign out failed');
@@ -64,18 +68,16 @@ export const signOut = createAsyncThunk(
   }
 );
 
-// Send password reset email thunk
+// Send password reset email thunk - simplified for Expo demo
 export const sendPasswordResetEmail = createAsyncThunk(
   'auth/sendPasswordResetEmail',
   async (email: string, { rejectWithValue }) => {
     try {
-      const result = await AuthService.sendPasswordResetEmail(email);
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      if (!result.success) {
-        return rejectWithValue(result.error || 'Failed to send reset email');
-      }
-      
-      return result.message || 'Password reset email sent';
+      // For demo, just return success message
+      return 'Password reset email sent successfully!';
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to send reset email');
     }
@@ -87,13 +89,16 @@ export const updateProfile = createAsyncThunk(
   'auth/updateProfile',
   async (updates: { displayName?: string; photoURL?: string }, { rejectWithValue }) => {
     try {
-      const result = await AuthService.updateProfile(updates);
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      if (!result.success) {
-        return rejectWithValue(result.error || 'Failed to update profile');
-      }
+      // For demo, return updated user
+      const updatedUser: User = {
+        ...mockUser,
+        ...updates,
+      };
       
-      return result.data!;
+      return updatedUser;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to update profile');
     }

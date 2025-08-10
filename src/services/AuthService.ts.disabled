@@ -1,8 +1,16 @@
-// import { FirebaseAuthTypes } from '@react-native-firebase/auth'; // Disabled for Expo
-// import FirebaseService from './FirebaseService'; // Disabled for Expo compatibility  
-import MockFirebaseService, { MockUser } from './MockFirebaseService'; // Using mock for Expo
+// Firebase types disabled for Expo compatibility
+// import { FirebaseAuthTypes } from '@react-native-firebase/auth';
+// import FirebaseService from './FirebaseService'; // Disabled for Expo compatibility
 import StorageService, { StoredAuthData } from './StorageService';
 import { User, ApiResponse } from '../types';
+
+// Mock types for Expo compatibility
+interface MockFirebaseUser {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  emailVerified: boolean;
+}
 
 export interface AuthResult {
   user: User;
@@ -15,7 +23,7 @@ export class AuthService {
    */
   static async signIn(email: string, password: string, rememberMe: boolean = true): Promise<ApiResponse<AuthResult>> {
     try {
-      const userCredential = await MockFirebaseService.signInWithEmailAndPassword(email, password);
+      const userCredential = await FirebaseService.signInWithEmailAndPassword(email, password);
       const firebaseUser = userCredential.user;
       
       const user: User = {
@@ -49,7 +57,7 @@ export class AuthService {
    */
   static async signUp(email: string, password: string, displayName?: string): Promise<ApiResponse<AuthResult>> {
     try {
-      const userCredential = await MockFirebaseService.createUserWithEmailAndPassword(email, password);
+      const userCredential = await FirebaseService.createUserWithEmailAndPassword(email, password);
       const firebaseUser = userCredential.user;
 
       // Update display name if provided
@@ -95,7 +103,7 @@ export class AuthService {
    */
   static async signOut(): Promise<ApiResponse<void>> {
     try {
-      await MockFirebaseService.signOut();
+      await FirebaseService.signOut();
       // Clear stored authentication data
       await this.clearStoredAuthData();
       return {
@@ -115,7 +123,7 @@ export class AuthService {
    */
   static async sendPasswordResetEmail(email: string): Promise<ApiResponse<void>> {
     try {
-      await MockFirebaseService.sendPasswordResetEmail(email);
+      await FirebaseService.sendPasswordResetEmail(email);
       return {
         success: true,
         message: 'Password reset email sent',
@@ -132,7 +140,7 @@ export class AuthService {
    * Get current authenticated user
    */
   static getCurrentUser(): User | null {
-    const firebaseUser = MockFirebaseService.getCurrentUser();
+    const firebaseUser = FirebaseService.getCurrentUser();
     if (!firebaseUser) return null;
 
     return {
@@ -148,7 +156,7 @@ export class AuthService {
    * Listen for authentication state changes
    */
   static onAuthStateChanged(callback: (user: User | null) => void): () => void {
-    return MockFirebaseService.onAuthStateChanged((firebaseUser: MockUser | null) => {
+    return FirebaseService.onAuthStateChanged((firebaseUser: FirebaseAuthTypes.User | null) => {
       if (firebaseUser) {
         const user: User = {
           id: firebaseUser.uid,
@@ -169,7 +177,7 @@ export class AuthService {
    */
   static async updateProfile(updates: { displayName?: string; photoURL?: string }): Promise<ApiResponse<User>> {
     try {
-      const firebaseUser = MockFirebaseService.getCurrentUser();
+      const firebaseUser = FirebaseService.getCurrentUser();
       if (!firebaseUser) {
         return {
           success: false,
@@ -208,7 +216,7 @@ export class AuthService {
    */
   private static async createUserProfile(userId: string, userData: Partial<User>): Promise<void> {
     try {
-      await MockFirebaseService.doc(`users/${userId}`).set({
+      await FirebaseService.doc(`users/${userId}`).set({
         ...userData,
         updatedAt: new Date().toISOString(),
       });
@@ -223,7 +231,7 @@ export class AuthService {
    */
   private static async updateUserProfile(userId: string, userData: Partial<User>): Promise<void> {
     try {
-      await MockFirebaseService.doc(`users/${userId}`).update({
+      await FirebaseService.doc(`users/${userId}`).update({
         ...userData,
         updatedAt: new Date().toISOString(),
       });

@@ -1,5 +1,4 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 
@@ -31,18 +30,16 @@ const RootNavigator: React.FC = () => {
   }
 
   return (
-    <NavigationContainer>
-      <RootStack.Navigator
-        screenOptions={{
-          headerShown: false,
-        }}>
-        {isAuthenticated ? (
-          <RootStack.Screen name="Main" component={MainTabNavigator} />
-        ) : (
-          <RootStack.Screen name="Auth" component={AuthStackNavigator} />
-        )}
-      </RootStack.Navigator>
-    </NavigationContainer>
+    <RootStack.Navigator
+      screenOptions={{
+        headerShown: false,
+      }}>
+      {isAuthenticated ? (
+        <RootStack.Screen name="Main" component={MainTabNavigator} />
+      ) : (
+        <RootStack.Screen name="Auth" component={AuthStackNavigator} />
+      )}
+    </RootStack.Navigator>
   );
 };
 

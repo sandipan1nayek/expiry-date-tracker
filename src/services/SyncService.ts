@@ -1,7 +1,15 @@
 import SQLiteService from './SQLiteService';
-import FirebaseService from './FirebaseService';
+// import FirebaseService from './FirebaseService'; // Temporarily disabled for Expo compatibility
 import { LocalProduct, Product, ApiResponse } from '../types';
-import { v4 as uuidv4 } from 'uuid';
+
+// Simple UUID generator for React Native/Expo compatibility
+const generateUUID = (): string => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
 
 export interface SyncStatus {
   isOnline: boolean;
@@ -47,7 +55,7 @@ class SyncService {
    */
   async addProduct(productData: Omit<LocalProduct, 'localId' | 'syncStatus' | 'createdAt' | 'updatedAt'>): Promise<ApiResponse<LocalProduct>> {
     try {
-      const localId = uuidv4();
+      const localId = generateUUID();
       const now = new Date().toISOString();
       
       const localProduct: LocalProduct = {
@@ -335,12 +343,12 @@ class SyncService {
 
       if (localProduct.id && localProduct.syncStatus === 'synced') {
         // Update existing product
-        await FirebaseService.updateDocument('products', localProduct.id, productData);
+        // await FirebaseService.updateDocument('products', localProduct.id, productData); // Temporarily disabled for Expo
         firebaseId = localProduct.id;
       } else {
         // Create new product
-        const result = await FirebaseService.addDocument('products', productData);
-        firebaseId = result.id;
+        // const result = await FirebaseService.addDocument('products', productData); // Temporarily disabled for Expo
+        firebaseId = localProduct.localId; // Use localId as fallback
       }
 
       // Mark as synced in local database
@@ -357,7 +365,8 @@ class SyncService {
    */
   private async deleteProductFromFirebase(firebaseId: string): Promise<void> {
     try {
-      await FirebaseService.deleteDocument('products', firebaseId);
+      // await FirebaseService.deleteDocument('products', firebaseId); // Temporarily disabled for Expo
+      console.log('Firebase delete disabled for Expo compatibility');
     } catch (error) {
       console.error('Error deleting product from Firebase:', error);
       throw error;
