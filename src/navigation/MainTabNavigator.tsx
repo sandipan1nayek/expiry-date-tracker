@@ -2,6 +2,7 @@ import React from 'react';
 import { Text } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Import main screens
 import InventoryListScreen from '../screens/inventory/InventoryListScreen';
@@ -16,8 +17,8 @@ import SettingsScreen from '../screens/settings/SettingsScreen';
 import MedicineListScreen from '../screens/medicine/MedicineListScreen';
 import AddMedicineScreen from '../screens/medicine/AddMedicineScreen';
 import MedicineDetailScreen from '../screens/medicine/MedicineDetailScreen';
-import AddScheduleScreen from '../screens/medicine/AddScheduleScreen';
 import TodaysIntakesScreen from '../screens/medicine/TodaysIntakesScreen';
+import AddScheduleScreen from '../screens/medicine/AddScheduleScreen';
 
 export type MainTabParamList = {
   InventoryTab: undefined;
@@ -129,18 +130,48 @@ const ProfileStackNavigator: React.FC = () => {
 };
 
 const MainTabNavigator: React.FC = () => {
+  const insets = useSafeAreaInsets();
+  
   return (
     <MainTab.Navigator
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: '#2196F3',
         tabBarInactiveTintColor: '#666',
+        tabBarStyle: {
+          paddingBottom: Math.max(insets.bottom, 15),
+          paddingTop: 15,
+          height: 70 + Math.max(insets.bottom, 15),
+          backgroundColor: '#fff',
+          borderTopWidth: 1,
+          borderTopColor: '#e1e8ed',
+          elevation: 8,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
+          marginTop: 4,
+        },
+        tabBarIconStyle: {
+          marginTop: 8,
+        },
       }}>
       <MainTab.Screen
         name="InventoryTab"
         component={InventoryStackNavigator}
         options={{
           title: 'Inventory',
+          tabBarIcon: ({ color, focused }) => (
+            <Text style={{ fontSize: focused ? 24 : 22, color }}>📦</Text>
+          ),
         }}
       />
       <MainTab.Screen
@@ -148,6 +179,9 @@ const MainTabNavigator: React.FC = () => {
         component={MedicineStackNavigator}
         options={{
           title: 'Medicine',
+          tabBarIcon: ({ color, focused }) => (
+            <Text style={{ fontSize: focused ? 24 : 22, color }}>💊</Text>
+          ),
         }}
       />
       <MainTab.Screen
@@ -155,13 +189,19 @@ const MainTabNavigator: React.FC = () => {
         component={ScannerScreen}
         options={{
           title: 'Scanner',
+          tabBarIcon: ({ color, focused }) => (
+            <Text style={{ fontSize: focused ? 24 : 22, color }}>📷</Text>
+          ),
         }}
       />
       <MainTab.Screen
         name="ProfileTab"
         component={ProfileStackNavigator}
         options={{
-          title: 'Profile',
+          title: 'Dashboard',
+          tabBarIcon: ({ color, focused }) => (
+            <Text style={{ fontSize: focused ? 24 : 22, color }}>📊</Text>
+          ),
         }}
       />
     </MainTab.Navigator>

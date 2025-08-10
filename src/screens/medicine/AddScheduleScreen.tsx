@@ -1,452 +1,746 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
   TextInput,
+  TouchableOpacity,
   Alert,
-  Switch,
+  Modal,
+  FlatList,
+  SafeAreaView,
+  StatusBar,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { ScheduleFrequency } from '../../types';
 import MedicineService from '../../services/MedicineService';
-import { MedicineStackParamList } from '../../navigation/MainTabNavigator';
+import { ScheduleFrequency } from '../../types';
 
-type NavigationProp = StackNavigationProp<MedicineStackParamList, 'AddSchedule'>;
-
-const COLORS = {
-  PRIMARY: '#2196F3',
-  SECONDARY: '#FF9800',
-  SUCCESS: '#4CAF50',
-  WARNING: '#FF9800',
-  ERROR: '#F44336',
-  WHITE: '#FFFFFF',
-  BLACK: '#000000',
-  GRAY: '#666666',
-  LIGHT_GRAY: '#F5F5F5',
-};
-
-interface TimeSlot {
-  id: string;
-  time: string;
+// Time Picker Modal Component
+interface TimePickerModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onSelectTime: (time: string) => void;
+  initialTime?: string;
 }
 
+const TimePickerModal: React.FC<TimePickerModalProps> = ({
+  visible,
+  onClose,
+  onSelectTime,
+  initialTime = '08:00',
+}) => {
+  const [selectedHour, setSelectedHour] = useState(parseInt(initialTime.split(':')[0]));
+  const [selectedMinute, setSelectedMinute] = useState(parseInt(initialTime.split(':')[1]));
+
+  const hours = Array.from({ length: 24 }, (_, i) => i);
+  const minutes = Array.from({ length: 60 }, (_, i) => i);
+
+  const quickPresets = [
+    { label: 'Morning', time: '08:00' },
+    { label: 'Afternoon', time: '12:00' },
+    { label: 'Evening', time: '18:00' },
+    { label: 'Night', time: '22:00' },
+  ];
+
+  const handleConfirm = () => {
+    const formattedTime = `${selectedHour.toString().padStart(2, '0')}:${selectedMinute.toString().padStart(2, '0')}`;
+    onSelectTime(formattedTime);
+    onClose();
+  };
+
+  const handlePresetSelect = (time: string) => {
+    const [hour, minute] = time.split(':').map(Number);
+    setSelectedHour(hour);
+    setSelectedMinute(minute);
+    onSelectTime(time);
+    onClose();
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <View style={styles.modalOverlay}>
+        <View style={styles.timePickerContainer}>
+          <View style={styles.timePickerHeader}>
+            <Text style={styles.timePickerTitle}>Select Time</Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Text style={styles.closeButtonText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Quick Presets */}
+          <View style={styles.presetsContainer}>
+            <Text style={styles.presetsTitle}>Quick Select:</Text>
+            <View style={styles.presetsRow}>
+              {quickPresets.map((preset) => (
+                <TouchableOpacity
+                  key={preset.label}
+                  style={styles.presetButton}
+                  onPress={() => handlePresetSelect(preset.time)}
+                >
+                  <Text style={styles.presetButtonText}>{preset.label}</Text>
+                  <Text style={styles.presetTimeText}>{preset.time}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Time Selector */}
+          <View style={styles.timeSelector}>
+            <View style={styles.timeSelectorColumn}>
+              <Text style={styles.timeSelectorLabel}>Hour</Text>
+              <ScrollView style={styles.timeScrollView} showsVerticalScrollIndicator={false}>
+                {hours.map((hour) => (
+                  <TouchableOpacity
+                    key={hour}
+                    style={[
+                      styles.timeOption,
+                      selectedHour === hour && styles.selectedTimeOption,
+                    ]}
+                    onPress={() => setSelectedHour(hour)}
+                  >
+                    <Text
+                      style={[
+                        styles.timeOptionText,
+                        selectedHour === hour && styles.selectedTimeOptionText,
+                      ]}
+                    >
+                      {hour.toString().padStart(2, '0')}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            <Text style={styles.timeSeparator}>:</Text>
+
+            <View style={styles.timeSelectorColumn}>
+              <Text style={styles.timeSelectorLabel}>Minute</Text>
+              <ScrollView style={styles.timeScrollView} showsVerticalScrollIndicator={false}>
+                {minutes.map((minute) => (
+                  <TouchableOpacity
+                    key={minute}
+                    style={[
+                      styles.timeOption,
+                      selectedMinute === minute && styles.selectedTimeOption,
+                    ]}
+                    onPress={() => setSelectedMinute(minute)}
+                  >
+                    <Text
+                      style={[
+                        styles.timeOptionText,
+                        selectedMinute === minute && styles.selectedTimeOptionText,
+                      ]}
+                    >
+                      {minute.toString().padStart(2, '0')}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+
+          {/* Current Selection Display */}
+          <View style={styles.currentTimeDisplay}>
+            <Text style={styles.currentTimeText}>
+              Selected Time: {selectedHour.toString().padStart(2, '0')}:{selectedMinute.toString().padStart(2, '0')}
+            </Text>
+          </View>
+
+          {/* Action Buttons */}
+          <View style={styles.timePickerActions}>
+            <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.confirmButton} onPress={handleConfirm}>
+              <Text style={styles.confirmButtonText}>Confirm</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+// Main AddScheduleScreen Component
 const AddScheduleScreen: React.FC = () => {
-  const navigation = useNavigation<NavigationProp>();
+  const navigation = useNavigation();
   const route = useRoute();
   const { medicineId } = route.params as { medicineId: string };
 
-  const [form, setForm] = useState({
-    frequency: 'daily' as ScheduleFrequency,
-    quantity: 1,
-    startDate: new Date().toISOString().split('T')[0],
-    endDate: '',
-    instructions: '',
-    reminderEnabled: true,
-    reminderMinutesBefore: 15,
-  });
+  const [medicineName, setMedicineName] = useState('');
+  const [schedules, setSchedules] = useState<string[]>(['08:00']);
+  const [frequency, setFrequency] = useState('Daily');
+  const [duration, setDuration] = useState('7');
+  const [notes, setNotes] = useState('');
+  const [isTimePickerVisible, setIsTimePickerVisible] = useState(false);
+  const [editingTimeIndex, setEditingTimeIndex] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([
-    { id: '1', time: '08:00' }
-  ]);
+  const frequencyOptions = ['Daily', 'Weekly', 'Bi-weekly', 'Monthly', 'As needed'];
 
-  const [isLoading, setIsLoading] = useState(false);
+  useEffect(() => {
+    loadMedicineData();
+  }, [medicineId]);
 
-  const addTimeSlot = () => {
-    const newId = (timeSlots.length + 1).toString();
-    setTimeSlots([...timeSlots, { id: newId, time: '12:00' }]);
-  };
-
-  const removeTimeSlot = (id: string) => {
-    if (timeSlots.length > 1) {
-      setTimeSlots(timeSlots.filter(slot => slot.id !== id));
-    }
-  };
-
-  const updateTimeSlot = (id: string, time: string) => {
-    setTimeSlots(timeSlots.map(slot => 
-      slot.id === id ? { ...slot, time } : slot
-    ));
-  };
-
-  const validateForm = () => {
-    if (form.quantity <= 0) {
-      Alert.alert('Error', 'Quantity must be greater than 0');
-      return false;
-    }
-
-    if (timeSlots.some(slot => !slot.time)) {
-      Alert.alert('Error', 'All time slots must have a valid time');
-      return false;
-    }
-
-    if (form.endDate && new Date(form.endDate) <= new Date(form.startDate)) {
-      Alert.alert('Error', 'End date must be after start date');
-      return false;
-    }
-
-    return true;
-  };
-
-  const handleSubmit = async () => {
-    if (!validateForm()) return;
-
-    setIsLoading(true);
+  const loadMedicineData = async () => {
     try {
+      // Load medicine details if editing existing schedule
+      // For now, we'll use a placeholder
+      setMedicineName('Medicine Name');
+    } catch (error) {
+      console.error('Error loading medicine data:', error);
+    }
+  };
+
+  const handleAddTime = () => {
+    setEditingTimeIndex(null);
+    setIsTimePickerVisible(true);
+  };
+
+  const handleEditTime = (index: number) => {
+    setEditingTimeIndex(index);
+    setIsTimePickerVisible(true);
+  };
+
+  const handleTimeSelect = (time: string) => {
+    if (editingTimeIndex !== null) {
+      // Edit existing time
+      const updatedSchedules = [...schedules];
+      updatedSchedules[editingTimeIndex] = time;
+      setSchedules(updatedSchedules);
+    } else {
+      // Add new time
+      setSchedules([...schedules, time]);
+    }
+  };
+
+  const handleRemoveTime = (index: number) => {
+    if (schedules.length > 1) {
+      const updatedSchedules = schedules.filter((_, i) => i !== index);
+      setSchedules(updatedSchedules);
+    } else {
+      Alert.alert('Error', 'At least one schedule time is required.');
+    }
+  };
+
+  const handleSaveSchedule = async () => {
+    if (!medicineName.trim()) {
+      Alert.alert('Error', 'Medicine name is required.');
+      return;
+    }
+
+    if (schedules.length === 0) {
+      Alert.alert('Error', 'At least one schedule time is required.');
+      return;
+    }
+
+    if (!duration.trim() || isNaN(Number(duration))) {
+      Alert.alert('Error', 'Please enter a valid duration in days.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Convert frequency to the expected enum format
+      const getScheduleFrequency = (freq: string): ScheduleFrequency => {
+        switch (freq.toLowerCase()) {
+          case 'daily': return 'daily';
+          case 'weekly': return 'weekly';
+          case 'as needed': return 'once';
+          default: return 'custom';
+        }
+      };
+
+      // Calculate end date based on duration
+      const startDate = new Date();
+      const endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + parseInt(duration));
+
       const scheduleData = {
         medicineId,
-        frequency: form.frequency,
-        times: timeSlots.map(slot => slot.time),
-        quantity: form.quantity,
-        startDate: form.startDate,
-        endDate: form.endDate || undefined,
-        instructions: form.instructions.trim() || undefined,
-        reminderEnabled: form.reminderEnabled,
-        reminderMinutesBefore: form.reminderMinutesBefore,
+        frequency: getScheduleFrequency(frequency),
+        times: schedules.sort(), // Array of time strings
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
         isActive: true,
+        reminderEnabled: true,
+        reminderMinutesBefore: 15, // Default 15 minutes before
       };
 
       await MedicineService.addSchedule(scheduleData);
-      Alert.alert('Success', 'Schedule created successfully');
-      navigation.goBack();
+      
+      Alert.alert(
+        'Success',
+        'Medicine schedule saved successfully!',
+        [
+          {
+            text: 'OK',
+            onPress: () => navigation.goBack(),
+          },
+        ]
+      );
     } catch (error) {
-      Alert.alert('Error', 'Failed to create schedule');
+      console.error('Error saving schedule:', error);
+      Alert.alert('Error', 'Failed to save schedule. Please try again.');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const renderTimeSlot = (slot: TimeSlot, index: number) => (
-    <View key={slot.id} style={styles.timeSlotContainer}>
-      <Text style={styles.timeSlotLabel}>Time {index + 1}:</Text>
-      <View style={styles.timeSlotRow}>
-        <TextInput
-          style={styles.timeInput}
-          value={slot.time}
-          onChangeText={(time) => updateTimeSlot(slot.id, time)}
-          placeholder="HH:MM (24-hour format)"
-        />
-        {timeSlots.length > 1 && (
-          <TouchableOpacity
-            style={styles.removeTimeButton}
-            onPress={() => removeTimeSlot(slot.id)}
-          >
-            <Text style={styles.removeTimeText}>Remove</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    </View>
-  );
-
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.form}>
-        <Text style={styles.title}>Create Medicine Schedule</Text>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
+      
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Add Medicine Schedule</Text>
+          <Text style={styles.subtitle}>Set up your medication reminders</Text>
+        </View>
+
+        {/* Medicine Name */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Medicine Information</Text>
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Medicine Name *</Text>
+            <TextInput
+              style={styles.textInput}
+              value={medicineName}
+              onChangeText={setMedicineName}
+              placeholder="Enter medicine name"
+              placeholderTextColor="#999"
+            />
+          </View>
+        </View>
+
+        {/* Schedule Times */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Schedule Times</Text>
+          <Text style={styles.sectionDescription}>
+            Set the times when you need to take this medicine
+          </Text>
+          
+          {schedules.map((time, index) => (
+            <View key={index} style={styles.timeSlot}>
+              <TouchableOpacity
+                style={styles.timeDisplay}
+                onPress={() => handleEditTime(index)}
+              >
+                <Text style={styles.timeText}>{time}</Text>
+                <Text style={styles.editText}>Tap to edit</Text>
+              </TouchableOpacity>
+              
+              {schedules.length > 1 && (
+                <TouchableOpacity
+                  style={styles.removeTimeButton}
+                  onPress={() => handleRemoveTime(index)}
+                >
+                  <Text style={styles.removeTimeText}>✕</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ))}
+          
+          <TouchableOpacity style={styles.addTimeButton} onPress={handleAddTime}>
+            <Text style={styles.addTimeText}>+ Add Another Time</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Frequency */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Frequency</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Frequency</Text>
           <View style={styles.frequencyContainer}>
-            {(['daily', 'twice_daily', 'three_times_daily', 'weekly', 'custom'] as ScheduleFrequency[]).map((freq) => (
+            {frequencyOptions.map((option) => (
               <TouchableOpacity
-                key={freq}
+                key={option}
                 style={[
-                  styles.frequencyButton,
-                  form.frequency === freq && styles.frequencyButtonActive
+                  styles.frequencyOption,
+                  frequency === option && styles.selectedFrequencyOption,
                 ]}
-                onPress={() => setForm({ ...form, frequency: freq })}
+                onPress={() => setFrequency(option)}
               >
-                <Text style={[
-                  styles.frequencyText,
-                  form.frequency === freq && styles.frequencyTextActive
-                ]}>
-                  {freq.replace('_', ' ').toUpperCase()}
+                <Text
+                  style={[
+                    styles.frequencyOptionText,
+                    frequency === option && styles.selectedFrequencyOptionText,
+                  ]}
+                >
+                  {option}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
-        {/* Time Slots */}
-        <View style={styles.inputGroup}>
-          <View style={styles.timeSlotsHeader}>
-            <Text style={styles.label}>Times</Text>
-            <TouchableOpacity style={styles.addTimeButton} onPress={addTimeSlot}>
-              <Text style={styles.addTimeText}>+ Add Time</Text>
-            </TouchableOpacity>
-          </View>
-          {timeSlots.map((slot, index) => renderTimeSlot(slot, index))}
-        </View>
-
-        {/* Quantity */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Quantity per dose</Text>
-          <TextInput
-            style={styles.input}
-            value={form.quantity.toString()}
-            onChangeText={(text) => setForm({ ...form, quantity: parseInt(text) || 1 })}
-            keyboardType="numeric"
-            placeholder="1"
-          />
-        </View>
-
-        {/* Date Range */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Start Date *</Text>
-          <TextInput
-            style={styles.input}
-            value={form.startDate}
-            onChangeText={(text) => setForm({ ...form, startDate: text })}
-            placeholder="YYYY-MM-DD"
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>End Date (Optional)</Text>
-          <TextInput
-            style={styles.input}
-            value={form.endDate}
-            onChangeText={(text) => setForm({ ...form, endDate: text })}
-            placeholder="YYYY-MM-DD (leave empty for indefinite)"
-          />
-        </View>
-
-        {/* Instructions */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Instructions (Optional)</Text>
-          <TextInput
-            style={[styles.input, styles.multilineInput]}
-            value={form.instructions}
-            onChangeText={(text) => setForm({ ...form, instructions: text })}
-            placeholder="e.g., Take with food, Avoid alcohol"
-            multiline
-            numberOfLines={3}
-          />
-        </View>
-
-        {/* Reminder Settings */}
-        <View style={styles.inputGroup}>
-          <View style={styles.reminderHeader}>
-            <Text style={styles.label}>Enable Reminders</Text>
-            <Switch
-              value={form.reminderEnabled}
-              onValueChange={(value) => setForm({ ...form, reminderEnabled: value })}
-              trackColor={{ false: COLORS.LIGHT_GRAY, true: COLORS.PRIMARY }}
-              thumbColor={form.reminderEnabled ? COLORS.WHITE : COLORS.GRAY}
+        {/* Duration */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Duration</Text>
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Number of days *</Text>
+            <TextInput
+              style={styles.textInput}
+              value={duration}
+              onChangeText={setDuration}
+              placeholder="e.g., 7"
+              keyboardType="numeric"
+              placeholderTextColor="#999"
             />
           </View>
-          
-          {form.reminderEnabled && (
-            <View style={styles.reminderSettings}>
-              <Text style={styles.reminderLabel}>Remind me (minutes before):</Text>
-              <View style={styles.reminderOptions}>
-                {[5, 10, 15, 30, 60].map((minutes) => (
-                  <TouchableOpacity
-                    key={minutes}
-                    style={[
-                      styles.reminderOption,
-                      form.reminderMinutesBefore === minutes && styles.reminderOptionActive
-                    ]}
-                    onPress={() => setForm({ ...form, reminderMinutesBefore: minutes })}
-                  >
-                    <Text style={[
-                      styles.reminderOptionText,
-                      form.reminderMinutesBefore === minutes && styles.reminderOptionTextActive
-                    ]}>
-                      {minutes}m
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
         </View>
 
-        {/* Submit Button */}
+        {/* Notes */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Additional Notes</Text>
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Notes (Optional)</Text>
+            <TextInput
+              style={[styles.textInput, styles.notesInput]}
+              value={notes}
+              onChangeText={setNotes}
+              placeholder="e.g., Take with food, before meals..."
+              multiline
+              numberOfLines={3}
+              placeholderTextColor="#999"
+            />
+          </View>
+        </View>
+
+        {/* Save Button */}
         <TouchableOpacity
-          style={[styles.submitButton, isLoading && styles.submitButtonDisabled]}
-          onPress={handleSubmit}
-          disabled={isLoading}
+          style={[styles.saveButton, loading && styles.saveButtonDisabled]}
+          onPress={handleSaveSchedule}
+          disabled={loading}
         >
-          <Text style={styles.submitButtonText}>
-            {isLoading ? 'Creating Schedule...' : 'Create Schedule'}
+          <Text style={styles.saveButtonText}>
+            {loading ? 'Saving...' : 'Save Schedule'}
           </Text>
         </TouchableOpacity>
-      </View>
-    </ScrollView>
+      </ScrollView>
+
+      {/* Time Picker Modal */}
+      <TimePickerModal
+        visible={isTimePickerVisible}
+        onClose={() => setIsTimePickerVisible(false)}
+        onSelectTime={handleTimeSelect}
+        initialTime={editingTimeIndex !== null ? schedules[editingTimeIndex] : '08:00'}
+      />
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.LIGHT_GRAY,
+    backgroundColor: '#f8f9fa',
   },
-  form: {
-    padding: 16,
+  scrollView: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  header: {
+    paddingVertical: 20,
+    paddingBottom: 10,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: COLORS.BLACK,
-    marginBottom: 20,
-    textAlign: 'center',
+    color: '#2c3e50',
+    marginBottom: 5,
   },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  label: {
+  subtitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.BLACK,
+    color: '#7f8c8d',
+    lineHeight: 22,
+  },
+  section: {
+    marginBottom: 25,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#2c3e50',
     marginBottom: 8,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: COLORS.LIGHT_GRAY,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: COLORS.WHITE,
+  sectionDescription: {
+    fontSize: 14,
+    color: '#7f8c8d',
+    marginBottom: 15,
+    lineHeight: 20,
   },
-  multilineInput: {
+  inputContainer: {
+    marginBottom: 15,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#34495e',
+    marginBottom: 6,
+  },
+  textInput: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e1e8ed',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#2c3e50',
+  },
+  notesInput: {
     height: 80,
     textAlignVertical: 'top',
+  },
+  timeSlot: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  timeDisplay: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e1e8ed',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  timeText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#2c3e50',
+  },
+  editText: {
+    fontSize: 12,
+    color: '#3498db',
+  },
+  removeTimeButton: {
+    marginLeft: 12,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#e74c3c',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  removeTimeText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  addTimeButton: {
+    backgroundColor: '#3498db',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  addTimeText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   frequencyContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 10,
   },
-  frequencyButton: {
+  frequencyOption: {
+    backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: COLORS.GRAY,
-    borderRadius: 8,
+    borderColor: '#e1e8ed',
+    borderRadius: 20,
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: COLORS.WHITE,
+    paddingVertical: 10,
   },
-  frequencyButtonActive: {
-    backgroundColor: COLORS.PRIMARY,
-    borderColor: COLORS.PRIMARY,
+  selectedFrequencyOption: {
+    backgroundColor: '#3498db',
+    borderColor: '#3498db',
   },
-  frequencyText: {
+  frequencyOptionText: {
     fontSize: 14,
-    color: COLORS.BLACK,
+    color: '#2c3e50',
+    fontWeight: '500',
   },
-  frequencyTextActive: {
-    color: COLORS.WHITE,
-    fontWeight: 'bold',
+  selectedFrequencyOptionText: {
+    color: '#fff',
   },
-  timeSlotsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  saveButton: {
+    backgroundColor: '#27ae60',
+    borderRadius: 12,
+    paddingVertical: 16,
     alignItems: 'center',
-    marginBottom: 12,
+    marginVertical: 20,
+    marginBottom: 40,
   },
-  addTimeButton: {
-    backgroundColor: COLORS.PRIMARY,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
+  saveButtonDisabled: {
+    backgroundColor: '#95a5a6',
   },
-  addTimeText: {
-    color: COLORS.WHITE,
-    fontSize: 14,
-    fontWeight: 'bold',
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
   },
-  timeSlotContainer: {
-    marginBottom: 12,
-  },
-  timeSlotLabel: {
-    fontSize: 14,
-    color: COLORS.GRAY,
-    marginBottom: 4,
-  },
-  timeSlotRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  timeInput: {
+  
+  // Time Picker Modal Styles
+  modalOverlay: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: COLORS.LIGHT_GRAY,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: COLORS.WHITE,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  removeTimeButton: {
-    backgroundColor: COLORS.ERROR,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
+  timePickerContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    width: '90%',
+    maxHeight: '80%',
+    paddingBottom: 20,
   },
-  removeTimeText: {
-    color: COLORS.WHITE,
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  reminderHeader: {
+  timePickerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e1e8ed',
   },
-  reminderSettings: {
-    backgroundColor: COLORS.WHITE,
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 8,
+  timePickerTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#2c3e50',
   },
-  reminderLabel: {
-    fontSize: 14,
-    color: COLORS.GRAY,
-    marginBottom: 8,
-  },
-  reminderOptions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  reminderOption: {
-    borderWidth: 1,
-    borderColor: COLORS.GRAY,
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: COLORS.WHITE,
-  },
-  reminderOptionActive: {
-    backgroundColor: COLORS.PRIMARY,
-    borderColor: COLORS.PRIMARY,
-  },
-  reminderOptionText: {
-    fontSize: 12,
-    color: COLORS.BLACK,
-  },
-  reminderOptionTextActive: {
-    color: COLORS.WHITE,
-    fontWeight: 'bold',
-  },
-  submitButton: {
-    backgroundColor: COLORS.SUCCESS,
-    padding: 16,
-    borderRadius: 8,
+  closeButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#f1f2f6',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 20,
   },
-  submitButtonDisabled: {
-    backgroundColor: COLORS.GRAY,
-  },
-  submitButtonText: {
-    color: COLORS.WHITE,
+  closeButtonText: {
     fontSize: 16,
+    color: '#7f8c8d',
+  },
+  presetsContainer: {
+    padding: 20,
+    paddingBottom: 10,
+  },
+  presetsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 10,
+  },
+  presetsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  presetButton: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignItems: 'center',
+    flex: 1,
+    marginHorizontal: 2,
+  },
+  presetButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#2c3e50',
+  },
+  presetTimeText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#3498db',
+    marginTop: 2,
+  },
+  timeSelector: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  timeSelectorColumn: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  timeSelectorLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 10,
+  },
+  timeScrollView: {
+    height: 120,
+    width: '100%',
+  },
+  timeOption: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    borderRadius: 8,
+    marginVertical: 2,
+  },
+  selectedTimeOption: {
+    backgroundColor: '#3498db',
+  },
+  timeOptionText: {
+    fontSize: 16,
+    color: '#2c3e50',
+  },
+  selectedTimeOptionText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  timeSeparator: {
+    fontSize: 24,
     fontWeight: 'bold',
+    color: '#2c3e50',
+    marginHorizontal: 20,
+  },
+  currentTimeDisplay: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 15,
+    margin: 20,
+    alignItems: 'center',
+  },
+  currentTimeText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2c3e50',
+  },
+  timePickerActions: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    gap: 10,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: '#f1f2f6',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    color: '#7f8c8d',
+    fontWeight: '600',
+  },
+  confirmButton: {
+    flex: 1,
+    backgroundColor: '#3498db',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  confirmButtonText: {
+    fontSize: 16,
+    color: '#fff',
+    fontWeight: '600',
   },
 });
 
